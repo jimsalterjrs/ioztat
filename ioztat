@@ -104,6 +104,7 @@ def parseDatasetsFreeBSD(pool):
     # Collect by objset_id, first
     objsets = {}
     r = subprocess.run(["sysctl", zfsDatasetKStatPrefix], capture_output=True, check=True, text=True)
+    now = time.time() * 1e9  # in seconds, now in nanoseconds
     current_objset = None
     for line in r.stdout.split("\n"):
         if not line.strip():
@@ -115,6 +116,7 @@ def parseDatasetsFreeBSD(pool):
         if objset_id != current_objset:
             current_objset = objset_id
             objsets[current_objset] = DatasetFreeBSD(objset_id)
+            objsets[current_objset].timestamp = now
         assert current_objset is not None
         objsets[current_objset].consume(field, value)
 
@@ -130,6 +132,7 @@ def parseDatasetsFreeBSD(pool):
 # that is specific for the host operating system.
 if os.uname().sysname == "FreeBSD":
     import subprocess  # Used to run sysctl(8)
+    import time # Used for bogus timestamp
     Dataset = DatasetFreeBSD
     parseDatasets = parseDatasetsFreeBSD
 else:
