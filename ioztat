@@ -104,7 +104,7 @@ def parseDatasetsFreeBSD(pool):
     # Collect by objset_id, first
     objsets = {}
     r = subprocess.run(["sysctl", zfsDatasetKStatPrefix], capture_output=True, check=True, text=True)
-    now = time.time() * 1e9  # in seconds, now in nanoseconds
+    now = time.monotonic_ns()
     current_objset = None
     for line in r.stdout.split("\n"):
         if not line.strip():
