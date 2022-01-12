@@ -84,7 +84,7 @@ elif sys.platform.startswith("freebsd"):
 
         def __init__(self, data = None):
             if data:
-                self.timestamp = time.monotonic_ns()
+                self.timestamp = data['timestamp']
                 self.name = data['dataset_name']
                 self.writes = data['writes']
                 self.nwritten = data['nwritten']
@@ -95,7 +95,8 @@ elif sys.platform.startswith("freebsd"):
         oid = "kstat.zfs." + pool + ".dataset."
         oidlen = len(oid)
         ctls = sysctl.filter(oid)
-        ds = defaultdict(dict)
+        timestamp = time.monotonic_ns()
+        ds = defaultdict(lambda: { 'timestamp': timestamp })
         for ctl in sysctl.filter(oid):
             name = ctl.name[oidlen:].split(".", 2)
             if len(name) == 2:
