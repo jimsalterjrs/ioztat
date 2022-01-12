@@ -84,7 +84,7 @@ elif sys.platform.startswith("freebsd"):
 
         def __init__(self, data = None):
             if data:
-                self.timestamp = time.monotonic() * 1e9
+                self.timestamp = time.monotonic_ns()
                 self.name = data['dataset_name']
                 self.writes = data['writes']
                 self.nwritten = data['nwritten']
