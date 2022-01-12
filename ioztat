@@ -1,0 +1,172 @@
+#!/usr/bin/python
+# Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
+
+# This work is licensed under the BSD 2-Clause License:
+#
+# Copyright 2022 Openoid LLC, on behalf of the reddit.com/r/zfs community.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+# IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import os
+import time
+import argparse
+
+zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
+zfsDatasetStatFilePrefix = 'objset-'
+
+class Dataset:
+    timestamp = 0
+    name = ''
+    writes = 0
+    nwritten = 0
+    reads = 0
+    nread = 0
+
+    def __init__(self, fn = None):
+        if fn:
+            with open(fn, 'r') as f:
+                for line in f:
+                    split = line.split()
+                    if len(split) == 7:
+                        self.timestamp = int(split[6])
+                    if split[0] == 'dataset_name':
+                        self.name = split[2]
+                    if split[0] == 'writes':
+                        self.writes = int(split[2])
+                    if split[0] == 'nwritten':
+                        self.nwritten = int(split[2])
+                    if split[0] == 'reads':
+                        self.reads = int(split[2])
+                    if split[0] == 'nread':
+                        self.nread = int(split[2])
+
+class DatasetDiff:
+    def __init__(self, old, new):
+        self.name = new.name
+        self.timediff = (new.timestamp - old.timestamp) / 1e9
+        self.wps = (new.writes - old.writes) / self.timediff
+        self.wMBps = (new.nwritten - old.nwritten) / self.timediff
+        self.rps = (new.reads - old.reads) / self.timediff
+        self.rMBps = (new.nread - old.nread) / self.timediff
+
+        try:
+            self.rareq_sz = (new.nread - old.nread) / (new.reads - old.reads)
+        except ZeroDivisionError:
+            self.rareq_sz = 0
+
+        try:
+            self.wareq_sz = (new.nwritten - old.nwritten) / (new.writes - old.writes)
+        except ZeroDivisionError:
+            self.wareq_sz = 0
+
+def parseDatasets(pool):
+    datasets = {}
+    for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
+        if file.startswith(zfsDatasetStatFilePrefix):
+            dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
+            datasets[dataset.name] = dataset
+    return datasets
+
+def calcDiff(prevdatasets, datasets):
+    diff = []
+    for key in datasets.keys():
+        if key in prevdatasets.keys():
+            diff.append(DatasetDiff(prevdatasets[key], datasets[key]))
+    return diff
+
+def calcDiffFromStart(datasets):
+    diff = []
+    for key in datasets.keys():
+        d = Dataset()
+        d.name = datasets[key]
+        diff.append(DatasetDiff(d, datasets[key]))
+    return diff
+
+def formatName(name):
+    cnt = name.count('/')
+    if cnt > 0:
+        return '   ' * name.count('/') + name.rsplit('/', 1)[1]
+    else:
+        return name
+
+parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
+parser.add_argument('pool', type=str, nargs='+', help='ZFS pool')
+parser.add_argument('-s', dest='sort', default='name2', type=str, help='Sort by: name / wps / wMBps / rps / rMBps')
+parser.add_argument('-i', dest='interval', default=1, type=float, help='Time between each report')
+parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
+parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
+parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
+args = parser.parse_args()
+
+if (args.skipsummary == True) and (args.count):
+    args.count = args.count + 1;
+
+prefixmultiplier = 1.0e3
+if args.binaryprefix:
+    prefixmultiplier = 2.0**10
+
+try:
+    prevdatasets = {}
+    index = 0
+    while(True):
+        datasets = {}
+        for pool in args.pool:
+            datasets.update(parseDatasets(pool))
+
+        diff = calcDiff(prevdatasets, datasets)
+        if index == 0:
+            diff = calcDiffFromStart(datasets)
+
+        if (args.sort == 'name') or (args.sort == 'name2'):
+            diff.sort(key = lambda x: x.name)
+        elif args.sort == 'wps':
+            diff.sort(key = lambda x: x.wps, reverse=True)
+        elif args.sort == 'wMBps':
+            diff.sort(key = lambda x: x.wMBps, reverse=True)
+        elif args.sort == 'rps':
+            diff.sort(key = lambda x: x.rps, reverse=True)
+        elif args.sort == 'rMBps':
+            diff.sort(key = lambda x: x.rMBps, reverse=True)
+
+        if (args.skipsummary == False) or (index > 0):
+            print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
+                .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
+
+            for d in diff:
+                name = d.name if args.sort != 'name2' else formatName(d.name)
+                print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
+                    d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
+                    d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
+                    d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
+            print('')
+
+        prevdatasets = datasets
+        index = index + 1
+
+        if (args.count) and (index >= args.count):
+            break
+
+        time.sleep(args.interval)
+
+except KeyboardInterrupt:
+    print('')
