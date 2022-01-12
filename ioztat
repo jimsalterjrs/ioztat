@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
@@ -30,58 +30,83 @@
 import os
 import time
 import argparse
+import sys
 
-zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
-zfsDatasetStatFilePrefix = 'objset-'
+if sys.platform.startswith("linux"):
+    zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
+    zfsDatasetStatFilePrefix = 'objset-'
 
-class DatasetBase:
-    timestamp = 0
-    name = ''
-    writes = 0
-    nwritten = 0
-    reads = 0
-    nread = 0
+    class Dataset:
+        timestamp = 0
+        name = ''
+        writes = 0
+        nwritten = 0
+        reads = 0
+        nread = 0
 
-### LINUX Support
-#
-#
-class DatasetLinux(DatasetBase):
-    def __init__(self, fn = None):
-        """
-        Read from file @p fn (presumably somewhere in /proc)
-        to get the fields for the dataset.
-        """
-        if fn:
-            with open(fn, 'r') as f:
-                for line in f:
-                    split = line.split()
-                    if len(split) == 7:
-                        self.timestamp = int(split[6])
-                    if split[0] == 'dataset_name':
-                        self.name = split[2]
-                    if split[0] == 'writes':
-                        self.writes = int(split[2])
-                    if split[0] == 'nwritten':
-                        self.nwritten = int(split[2])
-                    if split[0] == 'reads':
-                        self.reads = int(split[2])
-                    if split[0] == 'nread':
-                        self.nread = int(split[2])
+        def __init__(self, fn = None):
+            if fn:
+                with open(fn, 'r') as f:
+                    for line in f:
+                        split = line.split()
+                        if len(split) == 7:
+                            self.timestamp = int(split[6])
+                        if split[0] == 'dataset_name':
+                            self.name = split[2]
+                        if split[0] == 'writes':
+                            self.writes = int(split[2])
+                        if split[0] == 'nwritten':
+                            self.nwritten = int(split[2])
+                        if split[0] == 'reads':
+                            self.reads = int(split[2])
+                        if split[0] == 'nread':
+                            self.nread = int(split[2])
 
-def parseDatasetsLinux(pool):
-    datasets = {}
-    for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
-        if file.startswith(zfsDatasetStatFilePrefix):
-            dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
-            datasets[dataset.name] = dataset
-    return datasets
+    def parseDatasets(pool):
+        datasets = {}
+        for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
+            if file.startswith(zfsDatasetStatFilePrefix):
+                dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
+                datasets[dataset.name] = dataset
+        return datasets
+elif sys.platform.startswith("freebsd"):
+    # requires devel/py-sysctl
+    import sysctl
+    from collections import defaultdict
 
-### Generic code follows
-#
-# The remainer of the code is generic, although it uses a parseDatasets()
-# that is specific for the host operating system.
-Dataset = DatasetLinux
-parseDatasets = parseDatasetsLinux
+    class Dataset:
+        timestamp = 0
+        name = ''
+        writes = 0
+        nwritten = 0
+        reads = 0
+        nread = 0
+
+        def __init__(self, data = None):
+            if data:
+                self.timestamp = time.monotonic() * 1e9
+                self.name = data['dataset_name']
+                self.writes = data['writes']
+                self.nwritten = data['nwritten']
+                self.reads = data['reads']
+                self.nread = data['nread']
+
+    def parseDatasets(pool):
+        oid = "kstat.zfs." + pool + ".dataset."
+        oidlen = len(oid)
+        ctls = sysctl.filter(oid)
+        ds = defaultdict(dict)
+        for ctl in sysctl.filter(oid):
+            name = ctl.name[oidlen:].split(".", 2)
+            if len(name) == 2:
+                objset, oid = name
+                ds[objset][oid] = ctl.value
+
+        return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
+
+else:
+    print("Unsupported platform: " + sys.platform)
+    exit(1)
 
 class DatasetDiff:
     def __init__(self, old, new):
