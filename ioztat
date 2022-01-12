@@ -34,7 +34,7 @@ import argparse
 zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
 zfsDatasetStatFilePrefix = 'objset-'
 
-class Dataset:
+class DatasetBase:
     timestamp = 0
     name = ''
     writes = 0
@@ -42,7 +42,15 @@ class Dataset:
     reads = 0
     nread = 0
 
+### LINUX Support
+#
+#
+class DatasetLinux(DatasetBase):
     def __init__(self, fn = None):
+        """
+        Read from file @p fn (presumably somewhere in /proc)
+        to get the fields for the dataset.
+        """
         if fn:
             with open(fn, 'r') as f:
                 for line in f:
@@ -59,6 +67,21 @@ class Dataset:
                         self.reads = int(split[2])
                     if split[0] == 'nread':
                         self.nread = int(split[2])
+
+def parseDatasetsLinux(pool):
+    datasets = {}
+    for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
+        if file.startswith(zfsDatasetStatFilePrefix):
+            dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
+            datasets[dataset.name] = dataset
+    return datasets
+
+### Generic code follows
+#
+# The remainer of the code is generic, although it uses a parseDatasets()
+# that is specific for the host operating system.
+Dataset = DatasetLinux
+parseDatasets = parseDatasetsLinux
 
 class DatasetDiff:
     def __init__(self, old, new):
@@ -78,14 +101,6 @@ class DatasetDiff:
             self.wareq_sz = (new.nwritten - old.nwritten) / (new.writes - old.writes)
         except ZeroDivisionError:
             self.wareq_sz = 0
-
-def parseDatasets(pool):
-    datasets = {}
-    for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
-        if file.startswith(zfsDatasetStatFilePrefix):
-            dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
-            datasets[dataset.name] = dataset
-    return datasets
 
 def calcDiff(prevdatasets, datasets):
     diff = []
