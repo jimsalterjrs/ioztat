@@ -2,20 +2,20 @@
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
-# 
+#
 # Copyright (c) 2022, Openoid LLC, on behalf of the r/zfs community
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -76,12 +76,65 @@ def parseDatasetsLinux(pool):
             datasets[dataset.name] = dataset
     return datasets
 
+### FREEBSD Support
+#
+#
+class DatasetFreeBSD(DatasetBase):
+    def __init__(self, objset_id = None):
+        """
+        Prepare for reading sysctl data for the dataset with the given id.
+        The data is provided by sysctl, passed later to consume()
+        """
+        self.objset_id = objset_id
+
+    def consume(self, field, value):
+        if field == 'dataset_name':
+            self.name = value
+        if field == 'writes':
+            self.writes = int(value)
+        if field == 'nwritten':
+            self.nwritten = int(value)
+        if field == 'reads':
+            self.reads = int(value)
+        if field == 'nread':
+            self.nread = int(value)
+
+def parseDatasetsFreeBSD(pool):
+    zfsDatasetKStatPrefix = "kstat.zfs.{!s}.dataset".format(pool)
+    # Collect by objset_id, first
+    objsets = {}
+    r = subprocess.run(["sysctl", zfsDatasetKStatPrefix], capture_output=True, check=True, text=True)
+    current_objset = None
+    for line in r.stdout.split("\n"):
+        if not line.strip():
+            continue
+        # TODO: can a dataset name contain a ':' ?
+        key, value = line.split(":")
+        key_suffix = key[len(zfsDatasetKStatPrefix)+1:].strip()
+        objset_id, field = key_suffix.split(".")
+        if objset_id != current_objset:
+            current_objset = objset_id
+            objsets[current_objset] = DatasetFreeBSD(objset_id)
+        assert current_objset is not None
+        objsets[current_objset].consume(field, value)
+
+    datasets = {}
+    for objset in objsets.values():
+        datasets[objset.name] = objset
+    return datasets
+
+
 ### Generic code follows
 #
 # The remainer of the code is generic, although it uses a parseDatasets()
 # that is specific for the host operating system.
-Dataset = DatasetLinux
-parseDatasets = parseDatasetsLinux
+if os.uname().sysname == "FreeBSD":
+    import subprocess  # Used to run sysctl(8)
+    Dataset = DatasetFreeBSD
+    parseDatasets = parseDatasetsFreeBSD
+else:
+    Dataset = DatasetLinux
+    parseDatasets = parseDatasetsLinux
 
 class DatasetDiff:
     def __init__(self, old, new):
