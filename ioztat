@@ -103,14 +103,13 @@ def parseDatasetsFreeBSD(pool):
     zfsDatasetKStatPrefix = "kstat.zfs.{!s}.dataset".format(pool)
     # Collect by objset_id, first
     objsets = {}
-    r = subprocess.run(["sysctl", zfsDatasetKStatPrefix], capture_output=True, check=True, text=True)
+    r = subprocess.run(["sysctl", "-e", zfsDatasetKStatPrefix], capture_output=True, check=True, text=True)
     now = time.monotonic_ns()
     current_objset = None
     for line in r.stdout.split("\n"):
         if not line.strip():
             continue
-        # TODO: can a dataset name contain a ':' ?
-        key, value = line.split(":")
+        key, value = line.split("=")
         key_suffix = key[len(zfsDatasetKStatPrefix)+1:].strip()
         objset_id, field = key_suffix.split(".")
         if objset_id != current_objset:
