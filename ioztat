@@ -2,20 +2,20 @@
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
-# 
+#
 # Copyright (c) 2022, Openoid LLC, on behalf of the r/zfs community
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -32,18 +32,19 @@ import time
 import argparse
 import sys
 
+class DatasetBase:
+    timestamp = 0
+    name = ''
+    writes = 0
+    nwritten = 0
+    reads = 0
+    nread = 0
+
 if sys.platform.startswith("linux"):
     zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
     zfsDatasetStatFilePrefix = 'objset-'
 
-    class Dataset:
-        timestamp = 0
-        name = ''
-        writes = 0
-        nwritten = 0
-        reads = 0
-        nread = 0
-
+    class Dataset(DatasetBase):
         def __init__(self, fn = None):
             if fn:
                 with open(fn, 'r') as f:
@@ -70,18 +71,33 @@ if sys.platform.startswith("linux"):
                 datasets[dataset.name] = dataset
         return datasets
 elif sys.platform.startswith("freebsd"):
-    # requires devel/py-sysctl
-    import sysctl
+    # Attempt to use py-sysctl if available for best performance
+    try:
+        import sysctl
+    except ImportError:
+        # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
+        import subprocess
+
+        class SysctlOid:
+            name = ''
+            value = None
+
+            def __init__(self, name = '', value = None):
+                self.name = name
+                if value.isnumeric():
+                    self.value = int(value)
+                else:
+                    self.value = value
+
+        class sysctl:
+            def filter(oid):
+                r = subprocess.run(["sysctl", "-e", oid], capture_output=True, check=True, text=True)
+                stats = [line.split("=", 2) for line in r.stdout.split("\n")]
+                return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
+
     from collections import defaultdict
 
-    class Dataset:
-        timestamp = 0
-        name = ''
-        writes = 0
-        nwritten = 0
-        reads = 0
-        nread = 0
-
+    class Dataset(DatasetBase):
         def __init__(self, data = None):
             if data:
                 self.timestamp = data['timestamp']
