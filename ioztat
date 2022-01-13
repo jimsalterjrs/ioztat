@@ -110,7 +110,6 @@ elif sys.platform.startswith("freebsd"):
     def parseDatasets(pool):
         oid = "kstat.zfs." + pool + ".dataset."
         oidlen = len(oid)
-        ctls = sysctl.filter(oid)
         timestamp = time.monotonic_ns()
         ds = defaultdict(lambda: { 'timestamp': timestamp })
         for ctl in sysctl.filter(oid):
