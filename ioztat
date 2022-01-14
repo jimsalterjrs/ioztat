@@ -71,8 +71,8 @@ if sys.platform.startswith("linux"):
         return datasets
 
 elif sys.platform.startswith("freebsd"):
-    # Attempt to use py-sysctl if available for best performance
     try:
+        # Attempt to use py-sysctl if available for best performance
         import sysctl
     except ImportError:
         # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
