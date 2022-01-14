@@ -27,10 +27,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import time
 import argparse
+import os
 import sys
+import time
 
 class Dataset:
     timestamp = 0
@@ -50,18 +50,24 @@ class Dataset:
             self.nread = int(data['nread'])
 
 if sys.platform.startswith("linux"):
-    zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
-    zfsDatasetStatFilePrefix = 'objset-'
+    import glob
 
     def parseDatasets(pool):
         datasets = {}
-        for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
-            if file.startswith(zfsDatasetStatFilePrefix):
-                with open(zfsDatasetStatPathPrefix + '/' + pool + '/' + file, 'r') as f:
-                    header, _fieldnames, *fields = [line.split() for line in f]
-                    fields.append(("timestamp", None, header[6]))
-                    ds = Dataset({field[0]: field[2] for field in fields if len(fields) > 1})
-                    datasets[ds.name] = ds
+        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', glob.escape(pool), 'objset-*')):
+            # Shortened example of these files:
+            #############################################
+            # 31 1 0x01 7 2160 6165792836 1634992995579
+            # name             type data
+            # dataset_name     7    rpool/ROOT/default
+            #############################################
+            # Field 7 of the header is a nanosecond data snapshot timestamp.
+            # Conveniently, dataset names may not contain spaces.
+            with open(file, 'r') as f:
+                header, _fieldnames, *fields = [line.split() for line in f]
+                fields.append(("timestamp", None, header[6]))
+                ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
+                datasets[ds.name] = ds
         return datasets
 
 elif sys.platform.startswith("freebsd"):
