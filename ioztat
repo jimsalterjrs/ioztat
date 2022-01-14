@@ -32,7 +32,7 @@ import time
 import argparse
 import sys
 
-class DatasetBase:
+class Dataset:
     timestamp = 0
     name = ''
     writes = 0
@@ -40,36 +40,30 @@ class DatasetBase:
     reads = 0
     nread = 0
 
+    def __init__(self, data = None):
+        if data:
+            self.timestamp = int(data['timestamp'])
+            self.name = data['dataset_name']
+            self.writes = int(data['writes'])
+            self.nwritten = int(data['nwritten'])
+            self.reads = int(data['reads'])
+            self.nread = int(data['nread'])
+
 if sys.platform.startswith("linux"):
     zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
     zfsDatasetStatFilePrefix = 'objset-'
-
-    class Dataset(DatasetBase):
-        def __init__(self, fn = None):
-            if fn:
-                with open(fn, 'r') as f:
-                    for line in f:
-                        split = line.split()
-                        if len(split) == 7:
-                            self.timestamp = int(split[6])
-                        if split[0] == 'dataset_name':
-                            self.name = split[2]
-                        if split[0] == 'writes':
-                            self.writes = int(split[2])
-                        if split[0] == 'nwritten':
-                            self.nwritten = int(split[2])
-                        if split[0] == 'reads':
-                            self.reads = int(split[2])
-                        if split[0] == 'nread':
-                            self.nread = int(split[2])
 
     def parseDatasets(pool):
         datasets = {}
         for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
             if file.startswith(zfsDatasetStatFilePrefix):
-                dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
-                datasets[dataset.name] = dataset
+                with open(zfsDatasetStatPathPrefix + '/' + pool + '/' + file, 'r') as f:
+                    header, _fieldnames, *fields = [line.split() for line in f]
+                    fields.append(("timestamp", None, header[6]))
+                    ds = Dataset({field[0]: field[2] for field in fields if len(fields) > 1})
+                    datasets[ds.name] = ds
         return datasets
+
 elif sys.platform.startswith("freebsd"):
     # Attempt to use py-sysctl if available for best performance
     try:
@@ -84,10 +78,7 @@ elif sys.platform.startswith("freebsd"):
 
             def __init__(self, name = '', value = None):
                 self.name = name
-                if value.isnumeric():
-                    self.value = int(value)
-                else:
-                    self.value = value
+                self.value = value
 
         class sysctl:
             def filter(oid):
@@ -96,16 +87,6 @@ elif sys.platform.startswith("freebsd"):
                 return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
 
     from collections import defaultdict
-
-    class Dataset(DatasetBase):
-        def __init__(self, data = None):
-            if data:
-                self.timestamp = data['timestamp']
-                self.name = data['dataset_name']
-                self.writes = data['writes']
-                self.nwritten = data['nwritten']
-                self.reads = data['reads']
-                self.nread = data['nread']
 
     def parseDatasets(pool):
         oid = "kstat.zfs." + pool + ".dataset."
