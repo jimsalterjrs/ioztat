@@ -102,10 +102,25 @@ def calcDiffFromStart(datasets):
         diff.append(DatasetDiff(d, datasets[key]))
     return diff
 
-def formatName(name):
+def formatName(name, previous_name):
+    """
+    Formats a @p name (/-separated path components) and produces
+    a shortened version: each component that is suppressed, is replaced
+    by three spaces. @p previous_name gives the complete name used
+    in the previous line (`None` is acceptable) and is used to
+    find how many trailing parts of the @p name should be printed.
+    """
+    if not previous_name:
+        return name
+
     cnt = name.count('/')
     if cnt > 0:
-        return '   ' * name.count('/') + name.rsplit('/', 1)[1]
+        previous_parts = previous_name.split('/')
+        current_parts = name.split('/')
+        overlap_count = 0
+        while len(previous_parts) > overlap_count and len(current_parts) > overlap_count and previous_parts[overlap_count] == current_parts[overlap_count]:
+            overlap_count += 1
+        return '   ' * overlap_count + '/'.join(current_parts[overlap_count:])
     else:
         return name
 
@@ -152,12 +167,14 @@ try:
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
                 .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
+            previous_name = None
             for d in diff:
-                name = d.name if args.sort != 'name2' else formatName(d.name)
+                name = d.name if args.sort != 'name2' else formatName(d.name, previous_name)
                 print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
                     d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
                     d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
+                previous_name = d.name
             print('')
 
         prevdatasets = datasets
