@@ -2,20 +2,20 @@
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
-# 
+#
 # Copyright (c) 2022, Openoid LLC, on behalf of the r/zfs community
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -117,13 +117,6 @@ def calcDiffFromStart(datasets):
         diff.append(DatasetDiff(d, datasets[key]))
     return diff
 
-def formatName(name):
-    cnt = name.count('/')
-    if cnt > 0:
-        return '   ' * name.count('/') + name.rsplit('/', 1)[1]
-    else:
-        return name
-
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
 parser.add_argument('pool', type=str, nargs='+', help='ZFS pool')
 parser.add_argument('-s', dest='sort', default='name2', type=str, help='Sort by: name / wps / wMBps / rps / rMBps')
@@ -167,8 +160,21 @@ try:
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
                 .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
+            last_path = []
             for d in diff:
-                name = d.name if args.sort != 'name2' else formatName(d.name)
+                if args.sort == 'name2':
+                    cur_path = d.name.split('/')
+                    # Unmounted intermediate datasets can leave confusing gaps.
+                    # Find the longest shared segment with the previous path,
+                    # and print any missing intermediates.
+                    common = os.path.commonprefix([last_path, cur_path])
+                    for i, segment in enumerate(cur_path[len(common):-1]):
+                        print(('   ' * (len(common) + i)) + segment)
+                    name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
+                    last_path = cur_path
+                else:
+                    name = d.name
+
                 print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
                     d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
