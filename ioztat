@@ -166,7 +166,7 @@ try:
 
         if (args.skipsummary == False) or (index > 0):
             if (not args.nooverwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
-                for i in range(linesprinted + 2):
+                for _ in range(linesprinted + 2):
                   print("\033[F", end="")
             
             linesprinted = 0
