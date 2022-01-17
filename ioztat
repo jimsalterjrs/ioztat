@@ -27,9 +27,11 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import time
 import argparse
+import fnmatch
+import os
+import re
+import time
 
 zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
 zfsDatasetStatFilePrefix = 'objset-'
@@ -125,12 +127,13 @@ def formatName(name):
         return name
 
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
-parser.add_argument('pool', type=str, nargs='+', help='ZFS pool')
+parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset patterns')
 parser.add_argument('-s', dest='sort', default='name2', type=str, help='Sort by: name / wps / wMBps / rps / rMBps')
 parser.add_argument('-i', dest='interval', default=1, type=float, help='Time between each report')
 parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
+parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into parent datasets')
 args = parser.parse_args()
 
 if (args.skipsummary == True) and (args.count):
@@ -140,13 +143,32 @@ prefixmultiplier = 1.0e3
 if args.binaryprefix:
     prefixmultiplier = 2.0**10
 
+# Extract the pools to query - these do not yet support globs, though the necessary
+# listPools() function would be quite useful both for that and displaying all
+# datasets.
+pools = [dataset.split('/', 1)[0] for dataset in args.dataset]
+patterns = [fnmatch.translate(dataset) for dataset in args.dataset]
+if args.nonrecursive:
+    # prevent '*' from matching '/' by replacing the translated '.*'
+    patterns = [pattern.replace('.*', '[^/]*') for pattern in patterns]
+else:
+    # Strip end anchors by removing '\Z'
+    patterns = [re.sub(r'\\Z\Z', '', pattern, 1) for pattern in patterns]
+
+# Combine the patterns into one
+dataset_re = re.compile("|".join(patterns))
+
 try:
     prevdatasets = {}
     index = 0
     while(True):
         datasets = {}
-        for pool in args.pool:
+        for pool in pools:
             datasets.update(parseDatasets(pool))
+
+        # strip out any keys that don't match our filters
+        keys = {dataset for dataset in datasets.keys() if dataset_re.match(dataset)}
+        datasets = {key: datasets[key] for key in keys}
 
         diff = calcDiff(prevdatasets, datasets)
         if index == 0:
