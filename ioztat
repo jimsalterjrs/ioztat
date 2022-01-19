@@ -128,6 +128,10 @@ class DatasetDiff:
         except ZeroDivisionError:
             self.wareq_sz = 0
 
+    def nonzero(self):
+        """True if this DatasetDiff has any non-zero deltas"""
+        return self.wps or self.wMBps or self.rps or self.rMBps
+
 def calcDiff(prevdatasets, datasets):
     return [DatasetDiff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys()]
 
@@ -143,6 +147,8 @@ parser.add_argument('-c', dest='count', type=int, help='Number of reports genera
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into parent datasets')
+parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
+
 args = parser.parse_args()
 
 if (args.skipsummary == True) and (args.count):
@@ -173,6 +179,9 @@ try:
         diff = calcDiff(prevdatasets, datasets)
         if index == 0:
             diff = calcDiffFromStart(datasets)
+
+        if args.nonzero:
+            diff = list(filter(lambda d: d.nonzero(), diff))
 
         if (args.sort == 'name') or (args.sort == 'name2'):
             diff.sort(key = lambda x: x.name)
