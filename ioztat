@@ -129,19 +129,11 @@ class DatasetDiff:
             self.wareq_sz = 0
 
 def calcDiff(prevdatasets, datasets):
-    diff = []
-    for key in datasets.keys():
-        if key in prevdatasets.keys():
-            diff.append(DatasetDiff(prevdatasets[key], datasets[key]))
-    return diff
+    return [DatasetDiff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys()]
 
 def calcDiffFromStart(datasets):
-    diff = []
-    for key in datasets.keys():
-        d = Dataset()
-        d.name = datasets[key]
-        diff.append(DatasetDiff(d, datasets[key]))
-    return diff
+    zero = Dataset()
+    return [DatasetDiff(zero, dataset) for dataset in datasets.values()]
 
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
 parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
