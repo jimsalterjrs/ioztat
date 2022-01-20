@@ -146,6 +146,7 @@ parser.add_argument('-i', dest='interval', default=1, type=float, help='Time bet
 parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
+parser.add_argument('-o', dest='overwrite', default=False, action='store_true', help='Overwrite old reports in terminal')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into child datasets')
 parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
 
@@ -195,6 +196,12 @@ try:
             diff.sort(key = lambda x: x.rMBps, reverse=True)
 
         if diff and ((args.skipsummary == False) or (index > 0)):
+            if (args.overwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
+                for _ in range(linesprinted + 2):
+                  print("\033[F", end="")
+            
+            linesprinted = 0
+
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
                 .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
@@ -217,6 +224,7 @@ try:
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
                     d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
                     d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
+                linesprinted += 1
             print('')
 
         prevdatasets = datasets
