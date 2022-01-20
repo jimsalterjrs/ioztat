@@ -1,21 +1,21 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
-# 
+#
 # Copyright (c) 2022, Openoid LLC, on behalf of the r/zfs community
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,14 +27,13 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import time
 import argparse
+import os
+import re
+import sys
+import time
 
-zfsDatasetStatPathPrefix = '/proc/spl/kstat/zfs'
-zfsDatasetStatFilePrefix = 'objset-'
-
-class DatasetBase:
+class Dataset:
     timestamp = 0
     name = ''
     writes = 0
@@ -42,46 +41,73 @@ class DatasetBase:
     reads = 0
     nread = 0
 
-### LINUX Support
-#
-#
-class DatasetLinux(DatasetBase):
-    def __init__(self, fn = None):
-        """
-        Read from file @p fn (presumably somewhere in /proc)
-        to get the fields for the dataset.
-        """
-        if fn:
-            with open(fn, 'r') as f:
-                for line in f:
-                    split = line.split()
-                    if len(split) == 7:
-                        self.timestamp = int(split[6])
-                    if split[0] == 'dataset_name':
-                        self.name = split[2]
-                    if split[0] == 'writes':
-                        self.writes = int(split[2])
-                    if split[0] == 'nwritten':
-                        self.nwritten = int(split[2])
-                    if split[0] == 'reads':
-                        self.reads = int(split[2])
-                    if split[0] == 'nread':
-                        self.nread = int(split[2])
+    def __init__(self, data = None):
+        if data:
+            self.timestamp = int(data['timestamp'])
+            self.name = data['dataset_name']
+            self.writes = int(data['writes'])
+            self.nwritten = int(data['nwritten'])
+            self.reads = int(data['reads'])
+            self.nread = int(data['nread'])
 
-def parseDatasetsLinux(pool):
-    datasets = {}
-    for file in os.listdir(zfsDatasetStatPathPrefix + '/' + pool):
-        if file.startswith(zfsDatasetStatFilePrefix):
-            dataset = Dataset(zfsDatasetStatPathPrefix + '/' + pool + '/' + file)
-            datasets[dataset.name] = dataset
-    return datasets
+if sys.platform.startswith("linux"):
+    import glob
 
-### Generic code follows
-#
-# The remainer of the code is generic, although it uses a parseDatasets()
-# that is specific for the host operating system.
-Dataset = DatasetLinux
-parseDatasets = parseDatasetsLinux
+    def parseDatasets(pool):
+        datasets = {}
+        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', glob.escape(pool), 'objset-*')):
+            # Shortened example of these files:
+            #############################################
+            # 31 1 0x01 7 2160 6165792836 1634992995579
+            # name             type data
+            # dataset_name     7    rpool/ROOT/default
+            #############################################
+            # Field 7 of the header is a nanosecond data snapshot timestamp.
+            # Conveniently, dataset names may not contain spaces.
+            with open(file, 'r') as f:
+                header, _fieldnames, *fields = [line.split() for line in f]
+                fields.append(("timestamp", None, header[6]))
+                ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
+                datasets[ds.name] = ds
+        return datasets
+
+elif sys.platform.startswith("freebsd"):
+    try:
+        # Attempt to use py-sysctl if available for best performance
+        import sysctl
+    except ImportError:
+        # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
+        import subprocess
+
+        class SysctlOid:
+            def __init__(self, name = '', value = None):
+                self.name = name
+                self.value = value
+
+        class sysctl:
+            def filter(oid):
+                r = subprocess.run(["sysctl", "-e", oid], capture_output=True, check=True, text=True)
+                stats = [line.split("=", 2) for line in r.stdout.split("\n")]
+                return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
+
+    from collections import defaultdict
+
+    def parseDatasets(pool):
+        oid = "kstat.zfs." + pool + ".dataset."
+        oidlen = len(oid)
+        timestamp = time.monotonic_ns()
+        ds = defaultdict(lambda: { 'timestamp': timestamp })
+        for ctl in sysctl.filter(oid):
+            name = ctl.name[oidlen:].split(".", 2)
+            if len(name) == 2:
+                objset, oid = name
+                ds[objset][oid] = ctl.value
+
+        return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
+
+else:
+    print("Unsupported platform: " + sys.platform)
+    exit(1)
 
 class DatasetDiff:
     def __init__(self, old, new):
@@ -102,36 +128,28 @@ class DatasetDiff:
         except ZeroDivisionError:
             self.wareq_sz = 0
 
+    def nonzero(self):
+        """True if this DatasetDiff has any non-zero deltas"""
+        return self.wps or self.wMBps or self.rps or self.rMBps
+
 def calcDiff(prevdatasets, datasets):
-    diff = []
-    for key in datasets.keys():
-        if key in prevdatasets.keys():
-            diff.append(DatasetDiff(prevdatasets[key], datasets[key]))
-    return diff
+    return [DatasetDiff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys()]
 
 def calcDiffFromStart(datasets):
-    diff = []
-    for key in datasets.keys():
-        d = Dataset()
-        d.name = datasets[key]
-        diff.append(DatasetDiff(d, datasets[key]))
-    return diff
-
-def formatName(name):
-    cnt = name.count('/')
-    if cnt > 0:
-        return '   ' * name.count('/') + name.rsplit('/', 1)[1]
-    else:
-        return name
+    zero = Dataset()
+    return [DatasetDiff(zero, dataset) for dataset in datasets.values()]
 
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
-parser.add_argument('pool', type=str, nargs='+', help='ZFS pool')
+parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
 parser.add_argument('-s', dest='sort', default='name2', type=str, help='Sort by: name / wps / wMBps / rps / rMBps')
 parser.add_argument('-i', dest='interval', default=1, type=float, help='Time between each report')
 parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
 parser.add_argument('-n', dest='nooverwrite', default=False, action='store_true', help='Skip overwriting old reports in terminal')
+parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into child datasets')
+parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
+
 args = parser.parse_args()
 
 if (args.skipsummary == True) and (args.count):
@@ -141,17 +159,30 @@ prefixmultiplier = 1.0e3
 if args.binaryprefix:
     prefixmultiplier = 2.0**10
 
+pools = {dataset.split('/')[0] for dataset in args.dataset}
+if args.nonrecursive:
+    # Make each match exact.
+    dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "\Z", sorted(args.dataset))))
+else:
+    # Accept either an exact match or one with an additional component
+    dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "(?:\Z|/[^/]+)", sorted(args.dataset))))
+
 try:
     prevdatasets = {}
     index = 0
     while(True):
         datasets = {}
-        for pool in args.pool:
+        for pool in pools:
             datasets.update(parseDatasets(pool))
+
+        datasets = {name: dataset for name, dataset in datasets.items() if dataset_pattern.match(name)}
 
         diff = calcDiff(prevdatasets, datasets)
         if index == 0:
             diff = calcDiffFromStart(datasets)
+
+        if args.nonzero:
+            diff = list(filter(lambda d: d.nonzero(), diff))
 
         if (args.sort == 'name') or (args.sort == 'name2'):
             diff.sort(key = lambda x: x.name)
@@ -164,17 +195,31 @@ try:
         elif args.sort == 'rMBps':
             diff.sort(key = lambda x: x.rMBps, reverse=True)
 
-        if (args.skipsummary == False) or (index > 0):
+        if diff and ((args.skipsummary == False) or (index > 0)):
             if (not args.nooverwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
                 for _ in range(linesprinted + 2):
                   print("\033[F", end="")
             
             linesprinted = 0
+
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
                 .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
+            last_path = []
             for d in diff:
-                name = d.name if args.sort != 'name2' else formatName(d.name)
+                if args.sort == 'name2':
+                    cur_path = d.name.split('/')
+                    # Unmounted intermediate datasets can leave confusing gaps.
+                    # Find the longest shared segment with the previous path,
+                    # and print any missing intermediates.
+                    common = os.path.commonprefix([last_path, cur_path])
+                    for i, segment in enumerate(cur_path[len(common):-1]):
+                        print(('   ' * (len(common) + i)) + segment)
+                    name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
+                    last_path = cur_path
+                else:
+                    name = d.name
+
                 print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
                     d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
