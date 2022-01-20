@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Based on https://www.reddit.com/r/zfs/comments/s0gxp0/ok_i_made_it_tool_to_show_io_for_individual/
 
 # BSD 2-Clause License
