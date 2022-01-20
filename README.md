@@ -45,6 +45,6 @@ optional arguments:
   -z           Suppress datasets with zero activity
   ````
   
-The only required argument is the name of at least one zpool to monitor. Without any other arguments, `ioztat` first prints a summary record showing activity per dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
+The only required argument is the name of at least one dataset to monitor. Without any other arguments, `ioztat` first prints a summary record showing activity per dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
   
-For those who wish a continually-updated, easy to read summary of pool activity, `watch -n1 ioztat poolname -c1 -y` will suit nicely.  
+For those who wish a continually-updated, easy to read summary of pool activity, `watch -n1 ioztat datasetname -c1 -y` will suit nicely on Linux systems--on FreeBSD systems, you'll need to use `gnu-watch` (available via `pkg install gnu-watch`) instead.
