@@ -139,15 +139,26 @@ def calcDiffFromStart(datasets):
     zero = Dataset()
     return [DatasetDiff(zero, dataset) for dataset in datasets.values()]
 
+sorts = {
+    'name':  {'key': lambda x: x.name},
+    'rps':   {'key': lambda x: x.rps,   'reverse': True},
+    'wps':   {'key': lambda x: x.wps,   'reverse': True},
+    'rMBps': {'key': lambda x: x.rMBps, 'reverse': True},
+    'wMBps': {'key': lambda x: x.wMBps, 'reverse': True},
+}
+
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
 parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
-parser.add_argument('-s', dest='sort', default='name2', type=str, help='Sort by: name / wps / wMBps / rps / rMBps')
+parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='Field to sort by')
 parser.add_argument('-i', dest='interval', default=1, type=float, help='Time between each report')
 parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into child datasets')
 parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
+group = parser.add_mutually_exclusive_group()
+group.add_argument('-P', dest='fullname', default=None, action='store_true', help='Display dataset names on a single line')
+group.add_argument('-p', dest='fullname', default=None, action='store_false', help='Display dataset names as an abbreviated tree')
 
 args = parser.parse_args()
 
@@ -157,6 +168,10 @@ if (args.skipsummary == True) and (args.count):
 prefixmultiplier = 1.0e3
 if args.binaryprefix:
     prefixmultiplier = 2.0**10
+
+# Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
+if args.fullname is None:
+    args.fullname = args.sort != 'name' or args.nonzero
 
 pools = {dataset.split('/')[0] for dataset in args.dataset}
 if args.nonrecursive:
@@ -183,16 +198,10 @@ try:
         if args.nonzero:
             diff = list(filter(lambda d: d.nonzero(), diff))
 
-        if (args.sort == 'name') or (args.sort == 'name2'):
-            diff.sort(key = lambda x: x.name)
-        elif args.sort == 'wps':
-            diff.sort(key = lambda x: x.wps, reverse=True)
-        elif args.sort == 'wMBps':
-            diff.sort(key = lambda x: x.wMBps, reverse=True)
-        elif args.sort == 'rps':
-            diff.sort(key = lambda x: x.rps, reverse=True)
-        elif args.sort == 'rMBps':
-            diff.sort(key = lambda x: x.rMBps, reverse=True)
+        # Always sort by name first, so the main sort has it as a secondary
+        diff.sort(**sorts['name'])
+        if args.sort != 'name':
+            diff.sort(**sorts[args.sort])
 
         if diff and ((args.skipsummary == False) or (index > 0)):
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
@@ -200,7 +209,9 @@ try:
 
             last_path = []
             for d in diff:
-                if args.sort == 'name2':
+                if args.fullname:
+                    name = d.name
+                else:
                     cur_path = d.name.split('/')
                     # Unmounted intermediate datasets can leave confusing gaps.
                     # Find the longest shared segment with the previous path,
@@ -210,8 +221,6 @@ try:
                         print(('   ' * (len(common) + i)) + segment)
                     name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
                     last_path = cur_path
-                else:
-                    name = d.name
 
                 print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
