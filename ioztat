@@ -150,7 +150,7 @@ sorts = {
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
 parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
 parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='Field to sort by')
-parser.add_argument('-i', dest='interval', default=1, type=float, help='Time between each report (in seconds)')
+parser.add_argument('-i', dest='interval', default=1, type=float, help='Interval between reports (in seconds)')
 parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
 parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
