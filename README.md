@@ -27,12 +27,12 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 
 ````
 usage: ioztat [-h] [-s SORT] [-i INTERVAL] [-c COUNT] [-y] [-b]
-              pool [pool ...]
+              dataset [dataset ...]
 
 iostat for ZFS datasets
 
 positional arguments:
-  pool         ZFS pool
+  dataset      ZFS dataset
 
 optional arguments:
   -h, --help   show this help message and exit
@@ -41,6 +41,8 @@ optional arguments:
   -c COUNT     Number of reports generated
   -y           Skip the initial "summary" report
   -b           Use binary (power-of-two) prefixes
+  -n           Do not recurse into child datasets
+  -z           Suppress datasets with zero activity
   ````
   
 The only required argument is the name of at least one zpool to monitor. Without any other arguments, `ioztat` first prints a summary record showing activity per dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
