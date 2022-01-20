@@ -39,10 +39,11 @@ optional arguments:
   -h, --help            show this help message and exit
   -s {name,rps,wps,rMBps,wMBps}
                         Field to sort by
-  -i INTERVAL           Time between each report
+  -i INTERVAL           Interval between reports (in seconds)
   -c COUNT              Number of reports generated
   -y                    Skip the initial "summary" report
   -b                    Use binary (power-of-two) prefixes
+  -o                    Overwrite old reports in terminal
   -n                    Do not recurse into child datasets
   -z                    Suppress datasets with zero activity
   -P                    Display dataset names on a single line
