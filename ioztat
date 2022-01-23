@@ -27,6 +27,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+PROGRAM_VERSION = '1.1.0-dev'
+
 import argparse
 import os
 import re
@@ -157,6 +159,7 @@ parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true
 parser.add_argument('-o', dest='overwrite', default=False, action='store_true', help='Overwrite old reports in terminal')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into child datasets')
 parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
+parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-P', dest='fullname', default=None, action='store_true', help='Display dataset names on a single line')
 group.add_argument('-p', dest='fullname', default=None, action='store_false', help='Display dataset names as an abbreviated tree')
@@ -208,7 +211,7 @@ try:
             if (args.overwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
                 for _ in range(linesprinted + 2):
                   print("\033[F", end="")
-            
+
             linesprinted = 0
 
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
