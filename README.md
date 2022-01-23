@@ -28,7 +28,7 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 ````
 usage: ioztat [-b] [-c COUNT] [-h] [-i INTERVAL] [-n] [-o] [-P | -p] [-s {name,rps,wps,rMBps,wMBps}]
               [-y] [-V] [-z]
-              dataset [dataset ...]
+              [dataset [dataset ...]]
 
 iostat for ZFS datasets
 
@@ -51,6 +51,6 @@ optional arguments:
   -z                    suppress datasets with zero activity
   ````
 
-The only required argument is the name of at least one dataset to monitor. Without any other arguments, `ioztat` first prints a summary record showing activity per dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
+Without arguments, `ioztat` first prints a summary record showing activity for each mounted dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
 
-For those who wish a continually-updated, easy to read summary of pool activity, `watch -n1 ioztat datasetname -c1 -y` will suit nicely on Linux systems--on FreeBSD systems, you'll need to use `gnu-watch` (available via `pkg install gnu-watch`) instead.
+For a continually-updated, easy to read summary of pool activity, the `-o` argument will produce output similar to that of GNU watch.

@@ -55,9 +55,10 @@ class Dataset:
 if sys.platform.startswith("linux"):
     import glob
 
-    def parseDatasets(pool):
+    def parseDatasets(pool = None):
         datasets = {}
-        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', glob.escape(pool), 'objset-*')):
+        search = glob.escape(pool) if pool else '*'
+        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', search, 'objset-*')):
             # Shortened example of these files:
             #############################################
             # 31 1 0x01 7 2160 6165792836 1634992995579
@@ -94,15 +95,18 @@ elif sys.platform.startswith("freebsd"):
 
     from collections import defaultdict
 
-    def parseDatasets(pool):
-        oid = "kstat.zfs." + pool + ".dataset."
-        oidlen = len(oid)
+    def parseDatasets(pool = None):
+        # We're interested in kstat.zfs.*.dataset.objset-*.*
+        oid = "kstat.zfs."
+        if pool:
+            oid += pool + ".dataset."
+
         timestamp = time.monotonic_ns()
         ds = defaultdict(lambda: { 'timestamp': timestamp })
         for ctl in sysctl.filter(oid):
-            name = ctl.name[oidlen:].split(".", 2)
-            if len(name) == 2:
-                objset, oid = name
+            name = ctl.name.rsplit(".", 3)
+            if len(name) == 4 and name[1] == 'dataset':
+                objset, oid = name[2:4]
                 ds[objset][oid] = ctl.value
 
         return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
@@ -143,8 +147,12 @@ def calcDiffFromStart(datasets):
 
 def dataset_iter(pools):
     """Iterate over name: Dataset for pools"""
-    while True:
-        yield {name: dataset for pool in pools for name, dataset in parseDatasets(pool).items()}
+    if pools:
+        while True:
+            yield {name: dataset for pool in pools for name, dataset in parseDatasets(pool).items()}
+    else:
+        while True:
+            yield parseDatasets()
 
 def diff_iter(pools):
     """Iterate over [DatasetDiff] for pools"""
@@ -172,7 +180,7 @@ sorts = {
 
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
-parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
+parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='use binary (power-of-two) prefixes')
 parser.add_argument('-c', dest='count', type=int, help='number of reports generated')
 parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
