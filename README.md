@@ -26,8 +26,8 @@ ssd                                   0.00       0.00       0.00       0.00     
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-h] [-s {name,rps,wps,rMBps,wMBps}] [-i INTERVAL] [-c COUNT] [-y] [-b] [-o] [-n] [-z]
-              [-V] [-P | -p]
+usage: ioztat [-b] [-c COUNT] [-h] [-i INTERVAL] [-n] [-o] [-P | -p] [-s {name,rps,wps,rMBps,wMBps}]
+              [-y] [-V] [-z]
               dataset [dataset ...]
 
 iostat for ZFS datasets
@@ -36,19 +36,19 @@ positional arguments:
   dataset               ZFS dataset
 
 optional arguments:
+  -b                    use binary (power-of-two) prefixes
+  -c COUNT              number of reports generated
   -h, --help            show this help message and exit
+  -i INTERVAL           interval between reports (in seconds)
+  -n                    do not recurse into child datasets
+  -o                    overwrite old reports in terminal
+  -P                    display dataset names on a single line
+  -p                    display dataset names as an abbreviated tree
   -s {name,rps,wps,rMBps,wMBps}
-                        Field to sort by
-  -i INTERVAL           Interval between reports (in seconds)
-  -c COUNT              Number of reports generated
-  -y                    Skip the initial "summary" report
-  -b                    Use binary (power-of-two) prefixes
-  -o                    Overwrite old reports in terminal
-  -n                    Do not recurse into child datasets
-  -z                    Suppress datasets with zero activity
+                        field to sort by
+  -y                    skip the initial "summary" report
   -V, --version         show program's version number and exit
-  -P                    Display dataset names on a single line
-  -p                    Display dataset names as an abbreviated tree
+  -z                    suppress datasets with zero activity
   ````
 
 The only required argument is the name of at least one dataset to monitor. Without any other arguments, `ioztat` first prints a summary record showing activity per dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
