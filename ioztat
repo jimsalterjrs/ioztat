@@ -97,6 +97,7 @@ elif sys.platform.startswith("freebsd"):
 
     def parseDatasets(pool = None):
         # We're interested in kstat.zfs.*.dataset.objset-*.*
+        # Note objset ID's are only unique to individual pools
         oid = "kstat.zfs."
         if pool:
             oid += pool + ".dataset."
@@ -104,10 +105,10 @@ elif sys.platform.startswith("freebsd"):
         timestamp = time.monotonic_ns()
         ds = defaultdict(lambda: { 'timestamp': timestamp })
         for ctl in sysctl.filter(oid):
-            name = ctl.name.rsplit(".", 3)
-            if len(name) == 4 and name[1] == 'dataset':
-                objset, oid = name[2:4]
-                ds[objset][oid] = ctl.value
+            name = ctl.name.rsplit(".", 4)
+            if len(name) == 5 and name[2] == 'dataset':
+                _, pool, _, objset, oid = name
+                ds[(pool, objset)][oid] = ctl.value
 
         return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
 
