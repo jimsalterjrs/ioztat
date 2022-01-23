@@ -45,7 +45,7 @@ optional arguments:
   -P                    display dataset names on a single line
   -p                    display dataset names as an abbreviated tree
   -s {name,rps,wps,rMBps,wMBps}
-                        field to sort by
+                        sort by the specified field
   -y                    skip the initial "summary" report
   -V, --version         show program's version number and exit
   -z                    suppress datasets with zero activity
