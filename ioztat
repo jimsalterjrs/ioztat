@@ -144,10 +144,7 @@ def calcDiffFromStart(datasets):
 def dataset_iter(pools):
     """Iterate over name: Dataset for pools"""
     while True:
-        datasets = {}
-        for pool in pools:
-            datasets.update(parseDatasets(pool))
-        yield datasets
+        yield {name: dataset for pool in pools for name, dataset in parseDatasets(pool).items()}
 
 def diff_iter(pools):
     """Iterate over [DatasetDiff] for pools"""
