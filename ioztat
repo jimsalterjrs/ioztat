@@ -205,12 +205,10 @@ try:
             diff.sort(**sorts[args.sort])
 
         if diff and ((args.skipsummary == False) or (index > 0)):
-            if (args.overwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
-                for _ in range(linesprinted + 2):
-                  print("\033[F", end="")
+            if ((args.overwrite) and ((args.skipsummary == False) or (index > 0))) and (len(datasets) < len(prevdatasets)):
+              # If a dataset was removed, clear the rest of the screen.
+              sys.stdout.write("\033[0J")
             
-            linesprinted = 0
-
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
                 .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
@@ -233,7 +231,6 @@ try:
                     d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
                     d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
                     d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
-                linesprinted += 1
             print('')
 
         prevdatasets = datasets
@@ -242,7 +239,12 @@ try:
         if (args.count) and (index >= args.count):
             break
 
+        if (args.overwrite) and ((args.skipsummary == False) or (index > 0)):
+            sys.stdout.write(f"\033[{len(diff) + 2}F")
+
         time.sleep(args.interval)
 
 except KeyboardInterrupt:
+    if (args.overwrite) and ((args.skipsummary == False) or (index > 0)):
+        sys.stdout.write(f"\033[{len(diff) + 2}E")
     print('')
