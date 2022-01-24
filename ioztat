@@ -239,12 +239,12 @@ try:
         if (args.count) and (index >= args.count):
             break
 
-        if (args.overwrite) and ((args.skipsummary == False) or (index > 0)):
+        if (args.overwrite) and ((args.skipsummary == False) or (index > 1)):
             sys.stdout.write(f"\033[{len(diff) + 2}F")
 
         time.sleep(args.interval)
 
 except KeyboardInterrupt:
-    if (args.overwrite) and ((args.skipsummary == False) or (index > 0)):
+    if (args.overwrite) and ((args.skipsummary == False) or (index > 1)):
         sys.stdout.write(f"\033[{len(diff) + 2}E")
     print('')
