@@ -169,7 +169,7 @@ def diff_iter(pools):
 def filter_diff_iter(pools, pattern, nonzero):
     """Iterate over [DatasetDiff] for pools filtered by a name pattern and their d.nonzero() state"""
     for diff in diff_iter(pools):
-        yield list(filter(lambda d: pattern.match(d.name) and not nonzero or d.nonzero(), diff))
+        yield list(filter(lambda d: pattern.match(d.name) and (not nonzero or d.nonzero()), diff))
 
 sorts = {
     'name':  {'key': lambda x: x.name},
