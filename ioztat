@@ -204,9 +204,6 @@ parser.add_argument('-z', dest='nonzero', default=False, action='store_true', he
 
 args = parser.parse_args()
 
-if args.skipsummary and args.count:
-    args.count += 1;
-
 prefixmultiplier = 1.0e3
 if args.binaryprefix:
     prefixmultiplier = 2.0**10
@@ -223,15 +220,21 @@ else:
     # Accept either an exact match or one with an additional component
     dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "(?:\Z|/[^/]+)", sorted(args.dataset))))
 
+diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
+diff_loop = delay_iter(diff_loop, args.interval)
+
+if args.skipsummary or args.count:
+    import itertools
+    diff_loop = itertools.islice(diff_loop, int(args.skipsummary), args.count + int(args.skipsummary))
+
+diff_loop = filter(None, diff_loop)
+
 try:
-    for index, diff in enumerate(delay_iter(filter_diff_iter(pools, dataset_pattern, args.nonzero), args.interval)):
+    for diff in diff_loop:
         # Always sort by name first, so the main sort has it as a secondary
         diff.sort(**sorts['name'])
         if args.sort != 'name':
             diff.sort(**sorts[args.sort])
-
-        if (not diff) or (index == 0 and args.skipsummary):
-            continue
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
@@ -260,9 +263,6 @@ try:
                 d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
                 d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
         print('')
-
-        if args.count and index >= args.count:
-            break
 
 except KeyboardInterrupt:
     print('')
