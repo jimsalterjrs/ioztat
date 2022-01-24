@@ -55,9 +55,10 @@ class Dataset:
 if sys.platform.startswith("linux"):
     import glob
 
-    def parseDatasets(pool):
+    def parseDatasets(pool = None):
         datasets = {}
-        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', glob.escape(pool), 'objset-*')):
+        search = glob.escape(pool) if pool else '*'
+        for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', search, 'objset-*')):
             # Shortened example of these files:
             #############################################
             # 31 1 0x01 7 2160 6165792836 1634992995579
@@ -94,16 +95,20 @@ elif sys.platform.startswith("freebsd"):
 
     from collections import defaultdict
 
-    def parseDatasets(pool):
-        oid = "kstat.zfs." + pool + ".dataset."
-        oidlen = len(oid)
+    def parseDatasets(pool = None):
+        # We're interested in kstat.zfs.*.dataset.objset-*.*
+        # Note objset ID's are only unique to individual pools
+        oid = "kstat.zfs."
+        if pool:
+            oid += pool + ".dataset."
+
         timestamp = time.monotonic_ns()
         ds = defaultdict(lambda: { 'timestamp': timestamp })
         for ctl in sysctl.filter(oid):
-            name = ctl.name[oidlen:].split(".", 2)
-            if len(name) == 2:
-                objset, oid = name
-                ds[objset][oid] = ctl.value
+            name = ctl.name.rsplit(".", 4)
+            if len(name) == 5 and name[2] == 'dataset':
+                _, pool, _, objset, oid = name
+                ds[(pool, objset)][oid] = ctl.value
 
         return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
 
@@ -141,6 +146,37 @@ def calcDiffFromStart(datasets):
     zero = Dataset()
     return [DatasetDiff(zero, dataset) for dataset in datasets.values()]
 
+def dataset_iter(pools):
+    """Iterate over name: Dataset for pools"""
+    if pools:
+        while True:
+            yield {name: dataset for pool in pools for name, dataset in parseDatasets(pool).items()}
+    else:
+        while True:
+            yield parseDatasets()
+
+def diff_iter(pools):
+    """Iterate over [DatasetDiff] for pools"""
+    it = dataset_iter(pools)
+    prevdatasets = next(it)
+    # yield the initial summary
+    yield calcDiffFromStart(prevdatasets)
+
+    for datasets in it:
+        yield calcDiff(prevdatasets, datasets)
+        prevdatasets = datasets
+
+def filter_diff_iter(pools, pattern, nonzero):
+    """Iterate over [DatasetDiff] for pools filtered by a name pattern and their d.nonzero() state"""
+    for diff in diff_iter(pools):
+        yield list(filter(lambda d: pattern.match(d.name) and (not nonzero or d.nonzero()), diff))
+
+def delay_iter(it, interval):
+    """Add a delay after each iteration of a provided iterator"""
+    for item in it:
+        yield item
+        time.sleep(interval)
+
 sorts = {
     'name':  {'key': lambda x: x.name},
     'rps':   {'key': lambda x: x.rps,   'reverse': True},
@@ -151,7 +187,7 @@ sorts = {
 
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
-parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
+parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='use binary (power-of-two) prefixes')
 parser.add_argument('-c', dest='count', type=int, help='number of reports generated')
 parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
@@ -168,8 +204,8 @@ parser.add_argument('-z', dest='nonzero', default=False, action='store_true', he
 
 args = parser.parse_args()
 
-if (args.skipsummary == True) and (args.count):
-    args.count = args.count + 1;
+if args.skipsummary and args.count:
+    args.count += 1;
 
 prefixmultiplier = 1.0e3
 if args.binaryprefix:
@@ -188,66 +224,45 @@ else:
     dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "(?:\Z|/[^/]+)", sorted(args.dataset))))
 
 try:
-    prevdatasets = {}
-    index = 0
-    while(True):
-        datasets = {}
-        for pool in pools:
-            datasets.update(parseDatasets(pool))
-
-        datasets = {name: dataset for name, dataset in datasets.items() if dataset_pattern.match(name)}
-
-        diff = calcDiff(prevdatasets, datasets)
-        if index == 0:
-            diff = calcDiffFromStart(datasets)
-
-        if args.nonzero:
-            diff = list(filter(lambda d: d.nonzero(), diff))
-
+    for index, diff in enumerate(delay_iter(filter_diff_iter(pools, dataset_pattern, args.nonzero), args.interval)):
         # Always sort by name first, so the main sort has it as a secondary
         diff.sort(**sorts['name'])
         if args.sort != 'name':
             diff.sort(**sorts[args.sort])
 
-        if diff and ((args.skipsummary == False) or (index > 0)):
-            if (args.overwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
-                for _ in range(linesprinted + 2):
-                  print("\033[F", end="")
+        if (not diff) or (index == 0 and args.skipsummary):
+            continue
 
-            linesprinted = 0
+        if args.overwrite:
+            # Clear the screen and move the cursor to the upper-left
+            print("\033[2J\033[1;1H", end = '')
 
-            print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
-                .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
+        print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
+            .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
 
-            last_path = []
-            for d in diff:
-                if args.fullname:
-                    name = d.name
-                else:
-                    cur_path = d.name.split('/')
-                    # Unmounted intermediate datasets can leave confusing gaps.
-                    # Find the longest shared segment with the previous path,
-                    # and print any missing intermediates.
-                    common = os.path.commonprefix([last_path, cur_path])
-                    for i, segment in enumerate(cur_path[len(common):-1]):
-                        print(('   ' * (len(common) + i)) + segment)
-                    name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
-                    last_path = cur_path
+        last_path = []
+        for d in diff:
+            if args.fullname:
+                name = d.name
+            else:
+                cur_path = d.name.split('/')
+                # Unmounted intermediate datasets can leave confusing gaps.
+                # Find the longest shared segment with the previous path,
+                # and print any missing intermediates.
+                common = os.path.commonprefix([last_path, cur_path])
+                for i, segment in enumerate(cur_path[len(common):-1]):
+                    print(('   ' * (len(common) + i)) + segment)
+                name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
+                last_path = cur_path
 
-                print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
-                    d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
-                    d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
-                    d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
-                linesprinted += 1
-            print('')
+            print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
+                d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
+                d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
+                d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
+        print('')
 
-        prevdatasets = datasets
-        index = index + 1
-
-        if (args.count) and (index >= args.count):
+        if args.count and index >= args.count:
             break
-
-        time.sleep(args.interval)
 
 except KeyboardInterrupt:
     print('')
