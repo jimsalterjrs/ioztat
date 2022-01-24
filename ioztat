@@ -27,6 +27,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+PROGRAM_VERSION = '1.1.0-dev'
+
 import argparse
 import os
 import re
@@ -147,19 +149,22 @@ sorts = {
     'wMBps': {'key': lambda x: x.wMBps, 'reverse': True},
 }
 
-parser = argparse.ArgumentParser(description='iostat for ZFS datasets')
+# Keep this ordered alphabetically
+parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
 parser.add_argument('dataset', type=str, nargs='+', help='ZFS dataset')
-parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='Field to sort by')
-parser.add_argument('-i', dest='interval', default=1, type=float, help='Interval between reports (in seconds)')
-parser.add_argument('-c', dest='count', type=int, help='Number of reports generated')
-parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='Skip the initial "summary" report')
-parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='Use binary (power-of-two) prefixes')
-parser.add_argument('-o', dest='overwrite', default=False, action='store_true', help='Overwrite old reports in terminal')
-parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='Do not recurse into child datasets')
-parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='Suppress datasets with zero activity')
+parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='use binary (power-of-two) prefixes')
+parser.add_argument('-c', dest='count', type=int, help='number of reports generated')
+parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
+parser.add_argument('-i', dest='interval', default=1, type=float, help='interval between reports (in seconds)')
+parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='do not recurse into child datasets')
+parser.add_argument('-o', dest='overwrite', default=False, action='store_true', help='overwrite old reports in terminal')
 group = parser.add_mutually_exclusive_group()
-group.add_argument('-P', dest='fullname', default=None, action='store_true', help='Display dataset names on a single line')
-group.add_argument('-p', dest='fullname', default=None, action='store_false', help='Display dataset names as an abbreviated tree')
+group.add_argument('-P', dest='fullname', default=None, action='store_true', help='display dataset names on a single line')
+group.add_argument('-p', dest='fullname', default=None, action='store_false', help='display dataset names as an abbreviated tree')
+parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='sort by the specified field')
+parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='skip the initial "summary" report')
+parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
+parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='suppress datasets with zero activity')
 
 args = parser.parse_args()
 
@@ -208,7 +213,7 @@ try:
             if (args.overwrite) and (((args.skipsummary == False) and (index > 0)) or (index > 1)):
                 for _ in range(linesprinted + 2):
                   print("\033[F", end="")
-            
+
             linesprinted = 0
 
             print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
