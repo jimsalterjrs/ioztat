@@ -32,6 +32,7 @@ PROGRAM_VERSION = '1.1.0-dev'
 import argparse
 import os
 import re
+import shutil
 import sys
 import time
 
@@ -177,6 +178,41 @@ def delay_iter(it, interval):
         yield item
         time.sleep(interval)
 
+SIZE_PREFIX = 'KMGTPE'
+def bytes_to_human_si(b):
+    if b < 1000:
+        return '{bytes:.0f}'.format(bytes=b)
+
+    prefix = 0
+    while b >= 999950:
+        b /= 1000
+        prefix += 1
+
+    return '{bytes:.1f}{prefix}'.format(bytes=b / 1000, prefix=SIZE_PREFIX[prefix])
+
+def bytes_to_human_bi(b):
+    if b < 1024:
+        return '{bytes:.0f}'.format(bytes=b)
+
+    prefix = 0
+    while b > 1048576:
+        b /= 1024
+        prefix += 1
+
+    return '{bytes:.1f}{prefix}'.format(bytes=b / 1024, prefix=SIZE_PREFIX[prefix])
+
+def format_dataset(path, limit, ellipsis = '...'):
+    """Truncate a dataset name to a limit"""
+    if len(path) <= limit:
+        return path
+
+    # Always display the pool name
+    components = path.split('/', 1)
+    ret = components[0]
+    if components[1]:
+        ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
+    return ret
+
 sorts = {
     'name':  {'key': lambda x: x.name},
     'rps':   {'key': lambda x: x.rps,   'reverse': True},
@@ -190,6 +226,8 @@ parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help
 parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
 parser.add_argument('-b', dest='binaryprefix', default=False, action='store_true', help='use binary (power-of-two) prefixes')
 parser.add_argument('-c', dest='count', type=int, help='number of reports generated')
+parser.add_argument('-e', dest='exact', default=False, action='store_true', help='show exact values without truncation or scaling')
+parser.add_argument('-H', dest='scripted', default=False, action='store_true', help='scripted mode, skip headers and tab-separate')
 parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
 parser.add_argument('-i', dest='interval', default=1, type=float, help='interval between reports (in seconds)')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='do not recurse into child datasets')
@@ -205,13 +243,11 @@ parser.add_argument('-z', dest='nonzero', default=False, action='store_true', he
 
 args = parser.parse_args()
 
-prefixmultiplier = 1.0e3
-if args.binaryprefix:
-    prefixmultiplier = 2.0**10
+format_bytes = bytes_to_human_bi if args.binaryprefix else bytes_to_human_si
 
 # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
 if args.fullname is None:
-    args.fullname = args.sort != 'name' or args.nonzero
+    args.fullname = args.sort != 'name' or args.scripted or args.nonzero
 
 pools = {dataset.split('/')[0] for dataset in args.dataset}
 if args.nonrecursive:
@@ -240,6 +276,8 @@ try:
         if args.sort != 'name':
             diff.sort(**sorts[args.sort])
 
+        width, _ = shutil.get_terminal_size()
+
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
             print("\033[2J\033[1;1H", end = '')
@@ -249,8 +287,12 @@ try:
         elif args.timestamp == 'd':
             print(time.strftime('%c'))
 
-        print('{:40s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s} {:>10s}'
-            .format('dataset', 'w/s', 'wMB/s', 'r/s', 'rMB/s', 'wareq-sz', 'rareq-sz'))
+        if not args.scripted:
+            print('{:>40s}  {:^14s}  {:^14s}  {:^14s}'.format('', 'operations', 'bandwidth', 'opsize'))
+            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
+                .format('dataset', 'read', 'write', 'read', 'write', 'read', 'write'))
+            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
+                .format('-------', '-----', '-----', '-----', '-----', '-----', '-----'))
 
         last_path = []
         for d in diff:
@@ -267,11 +309,25 @@ try:
                 name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
                 last_path = cur_path
 
-            print('{:40s} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f} {:>10.2f}'.format(name,
-                d.wps, d.wMBps/prefixmultiplier/prefixmultiplier,
-                d.rps, d.rMBps/prefixmultiplier/prefixmultiplier,
-                d.wareq_sz/prefixmultiplier, d.rareq_sz/prefixmultiplier))
-        print('')
+            if args.scripted:
+                fmt = '{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}'
+            else:
+                fmt = '{:40s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}'
+
+            if args.exact:
+                vals = (name, round(d.wps), round(d.rps), round(d.rMBps), round(d.wMBps), round(d.wareq_sz), round(d.rareq_sz))
+            else:
+                vals = (
+                    format_dataset(name, 40), str(round(d.wps)), str(round(d.rps)),
+                    format_bytes(d.rMBps), format_bytes(d.wMBps),
+                    format_bytes(d.wareq_sz), format_bytes(d.rareq_sz)
+                )
+
+            print(fmt.format(*vals))
+
+        if not (args.scripted or args.overwrite):
+            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
+                .format('-------', '-----', '-----', '-----', '-----', '-----', '-----'))
 
 except KeyboardInterrupt:
     print('')
