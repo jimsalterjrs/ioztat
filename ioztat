@@ -268,7 +268,7 @@ if not args.overwrite:
     diff_loop = filter(None, diff_loop)
 
 try:
-    for diff in diff_loop:
+    for index, diff in enumerate(diff_loop):
         # Always sort by name first, so the main sort has it as a secondary
         diff.sort(**sorts['name'])
         if args.sort != 'name':
@@ -285,7 +285,7 @@ try:
         elif args.timestamp == 'd':
             print(time.strftime('%c'))
 
-        if not args.scripted:
+        if (index == 0 or args.overwrite) and not args.scripted:
             print('{:>40s}  {:^14s}  {:^14s}  {:^14s}'.format('', 'operations', 'bandwidth', 'opsize'))
             print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
                 .format('dataset', 'read', 'write', 'read', 'write', 'read', 'write'))
