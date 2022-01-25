@@ -178,28 +178,26 @@ def delay_iter(it, interval):
         yield item
         time.sleep(interval)
 
-SIZE_PREFIX = 'KMGTPE'
-def bytes_to_human_si(b):
-    if b < 1000:
-        return '{bytes:.0f}'.format(bytes=b)
+# A more complete take on this is available here
+# https://stackoverflow.com/questions/12523586/python-format-size-application-converting-b-to-kb-mb-gb-tb/63839503#63839503
+SIZE_PREFIX = ['K', 'M', 'G', 'T', 'P', 'E']
+SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
+def bytes_to_human(num, binary=False):
+    div = 1024 if binary else 1000
+    step = div - 0.05
 
-    prefix = 0
-    while b >= 999950:
-        b /= 1000
-        prefix += 1
+    if num < div:
+        return '{:.0f}'.format(num)
 
-    return '{bytes:.1f}{prefix}'.format(bytes=b / 1000, prefix=SIZE_PREFIX[prefix])
+    num /= div
 
-def bytes_to_human_bi(b):
-    if b < 1024:
-        return '{bytes:.0f}'.format(bytes=b)
+    for p in range(len(SIZE_PREFIX)):
+        if num < step:
+            break
+        if p < SIZE_PREFIX_MAX:
+            num /= div
 
-    prefix = 0
-    while b > 1048576:
-        b /= 1024
-        prefix += 1
-
-    return '{bytes:.1f}{prefix}'.format(bytes=b / 1024, prefix=SIZE_PREFIX[prefix])
+    return '{:.1f}{}'.format(num, SIZE_PREFIX[p])
 
 def format_dataset(path, limit, ellipsis = '...'):
     """Truncate a dataset name to a limit"""
@@ -243,7 +241,7 @@ parser.add_argument('-z', dest='nonzero', default=False, action='store_true', he
 
 args = parser.parse_args()
 
-format_bytes = bytes_to_human_bi if args.binaryprefix else bytes_to_human_si
+format_bytes = lambda num: bytes_to_human(num, args.binaryprefix)
 
 # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
 if args.fullname is None:
