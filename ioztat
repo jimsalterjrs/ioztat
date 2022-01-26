@@ -29,6 +29,9 @@
 
 PROGRAM_VERSION = '1.1.0-dev'
 
+# In -p mode, indent each segment by this string
+PATH_INDENT = '   '
+
 import argparse
 import os
 import re
@@ -255,6 +258,18 @@ else:
     # Accept either an exact match or one with an additional component
     dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "(?:\Z|/[^/]+)", sorted(args.dataset))))
 
+# Iterate over the full list to get a dataset column width
+if args.fullname:
+    def calc_name_width(path):
+        return len(path)
+else:
+    def calc_name_width(path):
+        segments = path.split('/')
+        return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
+
+summary = next(filter_diff_iter(pools, dataset_pattern, False))
+max_name_width = max(map(lambda d: calc_name_width(d.name), summary), default=30)
+
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 diff_loop = delay_iter(diff_loop, args.interval)
 
@@ -275,6 +290,8 @@ try:
             diff.sort(**sorts[args.sort])
 
         width, _ = shutil.get_terminal_size()
+        avail_width = width - (8 * 6)
+        name_width = max(10, min([avail_width, max_name_width]))
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
@@ -286,14 +303,15 @@ try:
             print(time.strftime('%c'))
 
         if (index == 0 or args.overwrite) and not args.scripted:
-            print('{:>40s}  {:^14s}  {:^14s}  {:^14s}'.format('', 'operations', 'bandwidth', 'opsize'))
-            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
-                .format('dataset', 'read', 'write', 'read', 'write', 'read', 'write'))
-            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
-                .format('-------', '-----', '-----', '-----', '-----', '-----', '-----'))
+            print('{:{name_width}s}  {:^14s}  {:^14s}  {:^14s}'.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width))
+            print('{:{name_width}s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
+                .format('dataset', 'read', 'write', 'read', 'write', 'read', 'write', name_width=name_width))
+            print('{:-^{name_width}}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}'
+                .format('', '', '', '', '', '', '', name_width=name_width))
 
         last_path = []
         for d in diff:
+            max_name_width = max(calc_name_width(d.name), max_name_width)
             if args.fullname:
                 name = d.name
             else:
@@ -303,29 +321,29 @@ try:
                 # and print any missing intermediates.
                 common = os.path.commonprefix([last_path, cur_path])
                 for i, segment in enumerate(cur_path[len(common):-1]):
-                    print(('   ' * (len(common) + i)) + segment)
-                name = ('   ' * (len(cur_path) - 1)) + cur_path[-1]
+                    print((PATH_INDENT * (len(common) + i)) + segment)
+                name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
                 last_path = cur_path
 
             if args.scripted:
                 fmt = '{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}'
             else:
-                fmt = '{:40s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}'
+                fmt = '{:{name_width}s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}'
 
             if args.exact:
                 vals = (name, round(d.wps), round(d.rps), round(d.rMBps), round(d.wMBps), round(d.wareq_sz), round(d.rareq_sz))
             else:
                 vals = (
-                    format_dataset(name, 40), str(round(d.wps)), str(round(d.rps)),
+                    format_dataset(name, name_width), str(round(d.wps)), str(round(d.rps)),
                     format_bytes(d.rMBps), format_bytes(d.wMBps),
-                    format_bytes(d.wareq_sz), format_bytes(d.rareq_sz)
+                    format_bytes(d.wareq_sz), format_bytes(d.rareq_sz),
                 )
 
-            print(fmt.format(*vals))
+            print(fmt.format(*vals, name_width=name_width))
 
         if not (args.scripted or args.overwrite):
-            print('{:40s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
-                .format('-------', '-----', '-----', '-----', '-----', '-----', '-----'))
+            print('{:-^{name_width}}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}'
+                .format('', '', '', '', '', '', '', name_width=name_width))
 
 except KeyboardInterrupt:
     print('')
