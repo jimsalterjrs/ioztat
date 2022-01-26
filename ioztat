@@ -269,6 +269,7 @@ else:
 
 summary = next(filter_diff_iter(pools, dataset_pattern, False))
 max_name_width = max(map(lambda d: calc_name_width(d.name), summary), default=30)
+field_width = 12 if args.exact else 6
 
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 diff_loop = delay_iter(diff_loop, args.interval)
@@ -282,6 +283,27 @@ if args.skip or args.count is not None:
 if not args.overwrite:
     diff_loop = filter(None, diff_loop)
 
+NUM_NUMERIC_COLUMNS = 6
+HEADER_GROUP_FORMAT = '{:{name_width}}' + ('  {:^{field_width}}' * 3)
+HEADER_FORMAT = '{:{name_width}}' + ('  {:>{field_width}}' * NUM_NUMERIC_COLUMNS)
+DIV_FORMAT = '{empty:-^{name_width}}' + ('  {empty:-^{field_width}}' * NUM_NUMERIC_COLUMNS)
+
+if args.scripted:
+    COLUMN_FORMAT = "\t".join(["{}"] * 7)
+else:
+    COLUMN_FORMAT = '{:{name_width}}' + ('  {:>{field_width}}' * NUM_NUMERIC_COLUMNS)
+
+def print_header(name_width, field_width):
+    print(HEADER_GROUP_FORMAT.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width, field_width=field_width*2))
+    print(HEADER_FORMAT.format('dataset', 'read', 'write', 'read', 'write', 'read', 'write', name_width=name_width, field_width=field_width))
+    print_div(name_width, field_width)
+
+def print_div(name_width, field_width):
+    print(DIV_FORMAT.format(empty='', name_width=name_width, field_width=field_width))
+
+def print_columns(name_width, field_width, columns):
+    print(COLUMN_FORMAT.format(*columns, name_width=name_width, field_width=field_width))
+
 try:
     for index, diff in enumerate(diff_loop):
         # Always sort by name first, so the main sort has it as a secondary
@@ -290,7 +312,7 @@ try:
             diff.sort(**sorts[args.sort])
 
         width, _ = shutil.get_terminal_size()
-        avail_width = width - (8 * 6)
+        avail_width = width - ((field_width + 2) * NUM_NUMERIC_COLUMNS)
         name_width = max(10, min([avail_width, max_name_width]))
 
         if args.overwrite:
@@ -303,11 +325,7 @@ try:
             print(time.strftime('%c'))
 
         if (index == 0 or args.overwrite) and not args.scripted:
-            print('{:{name_width}s}  {:^14s}  {:^14s}  {:^14s}'.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width))
-            print('{:{name_width}s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}  {:>6s}'
-                .format('dataset', 'read', 'write', 'read', 'write', 'read', 'write', name_width=name_width))
-            print('{:-^{name_width}}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}'
-                .format('', '', '', '', '', '', '', name_width=name_width))
+            print_header(name_width, field_width)
 
         last_path = []
         for d in diff:
@@ -325,25 +343,19 @@ try:
                 name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
                 last_path = cur_path
 
-            if args.scripted:
-                fmt = '{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}\t{!s}'
-            else:
-                fmt = '{:{name_width}s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}'
-
             if args.exact:
-                vals = (name, round(d.rps), round(d.wps), round(d.rMBps), round(d.wMBps), round(d.rareq_sz), round(d.wareq_sz))
+                cols = (name, round(d.rps), round(d.wps), round(d.rMBps), round(d.wMBps), round(d.rareq_sz), round(d.wareq_sz))
             else:
-                vals = (
+                cols = (
                     format_dataset(name, name_width), round(d.rps), round(d.wps),
                     format_bytes(d.rMBps), format_bytes(d.wMBps),
                     format_bytes(d.rareq_sz), format_bytes(d.wareq_sz)
                 )
 
-            print(fmt.format(*vals, name_width=name_width))
+            print_columns(name_width, field_width, cols)
 
         if not (args.scripted or args.overwrite):
-            print('{:-^{name_width}}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}  {:->6}'
-                .format('', '', '', '', '', '', '', name_width=name_width))
+            print_div(name_width, field_width)
 
 except KeyboardInterrupt:
     print('')
