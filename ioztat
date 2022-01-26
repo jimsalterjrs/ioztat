@@ -199,7 +199,7 @@ group.add_argument('-P', dest='fullname', default=None, action='store_true', hel
 group.add_argument('-p', dest='fullname', default=None, action='store_false', help='display dataset names as an abbreviated tree')
 parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='sort by the specified field')
 parser.add_argument('-T', dest='timestamp', default=False, choices=['u', 'd'], help='prefix each report with a Unix timestamp or formatted date')
-parser.add_argument('-y', dest='skipsummary', default=False, action='store_true', help='skip the initial "summary" report')
+parser.add_argument('-y', dest='skip', default=0, action='store_const', const=1, help='skip the initial "summary" report')
 parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
 parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='suppress datasets with zero activity')
 
@@ -224,9 +224,11 @@ else:
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 diff_loop = delay_iter(diff_loop, args.interval)
 
-if args.skipsummary or args.count:
+if args.skip or args.count is not None:
     import itertools
-    diff_loop = itertools.islice(diff_loop, int(args.skipsummary), args.count + int(args.skipsummary))
+    if args.count:
+        args.count += args.skip
+    diff_loop = itertools.islice(diff_loop, args.skip, args.count)
 
 if not args.overwrite:
     diff_loop = filter(None, diff_loop)
