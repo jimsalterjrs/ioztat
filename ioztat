@@ -294,7 +294,7 @@ else:
     COLUMN_FORMAT = '{:{name_width}}' + ('  {:>{field_width}}' * NUM_NUMERIC_COLUMNS)
 
 def print_header(name_width, field_width):
-    print(HEADER_GROUP_FORMAT.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width, field_width=field_width*2))
+    print(HEADER_GROUP_FORMAT.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width, field_width=field_width*2+2))
     print(HEADER_FORMAT.format('dataset', 'read', 'write', 'read', 'write', 'read', 'write', name_width=name_width, field_width=field_width))
     print_div(name_width, field_width)
 
