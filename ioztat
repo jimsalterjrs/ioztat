@@ -331,12 +331,12 @@ try:
                 fmt = '{:{name_width}s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}  {!s:>6s}'
 
             if args.exact:
-                vals = (name, round(d.wps), round(d.rps), round(d.rMBps), round(d.wMBps), round(d.wareq_sz), round(d.rareq_sz))
+                vals = (name, round(d.rps), round(d.wps), round(d.rMBps), round(d.wMBps), round(d.rareq_sz), round(d.wareq_sz))
             else:
                 vals = (
-                    format_dataset(name, name_width), str(round(d.wps)), str(round(d.rps)),
+                    format_dataset(name, name_width), round(d.rps), round(d.wps),
                     format_bytes(d.rMBps), format_bytes(d.wMBps),
-                    format_bytes(d.wareq_sz), format_bytes(d.rareq_sz),
+                    format_bytes(d.rareq_sz), format_bytes(d.wareq_sz)
                 )
 
             print(fmt.format(*vals, name_width=name_width))
