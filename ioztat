@@ -227,7 +227,8 @@ if args.skipsummary or args.count:
     import itertools
     diff_loop = itertools.islice(diff_loop, int(args.skipsummary), args.count + int(args.skipsummary))
 
-diff_loop = filter(None, diff_loop)
+if not args.overwrite:
+    diff_loop = filter(None, diff_loop)
 
 try:
     for diff in diff_loop:
