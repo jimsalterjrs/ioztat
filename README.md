@@ -27,7 +27,7 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 
 ````
 usage: ioztat [-b] [-c COUNT] [-h] [-i INTERVAL] [-n] [-o] [-P | -p] [-s {name,rps,wps,rMBps,wMBps}]
-              [-y] [-V] [-z]
+              [-T {u,d}] [-y] [-V] [-z]
               [dataset [dataset ...]]
 
 iostat for ZFS datasets
@@ -46,6 +46,7 @@ optional arguments:
   -p                    display dataset names as an abbreviated tree
   -s {name,rps,wps,rMBps,wMBps}
                         sort by the specified field
+  -T {u,d}              prefix each report with a Unix timestamp or formatted date
   -y                    skip the initial "summary" report
   -V, --version         show program's version number and exit
   -z                    suppress datasets with zero activity
