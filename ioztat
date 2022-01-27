@@ -255,7 +255,7 @@ class ColumnFormatter:
 
         self.groups.add_column(name, columns=self.columns[-colspan:], width=len(self.column_separator) * (colspan - 1), just=just)
 
-    def set_width(self, column, width):
+    def set_column_width(self, column, width):
         self.columns[column].width = width
 
     def print_columns(self, columns):
@@ -309,7 +309,7 @@ format_bytes = lambda num: bytes_to_human(num, args.binaryprefix)
 
 # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
 if args.fullname is None:
-    args.fullname = args.sort != 'name' or args.scripted or args.nonzero
+    args.fullname = args.sort != 'name' or args.scripted or args.exact or args.nonzero
 
 pools = {dataset.split('/')[0] for dataset in args.dataset}
 if args.nonrecursive:
@@ -380,8 +380,7 @@ try:
         width, _ = shutil.get_terminal_size()
         avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
         name_width = max(10, min([avail_width, max_name_width]))
-        formatter.columns[0].width = name_width
-        # formatter.groups.columns[0].width = name_width
+        formatter.set_column_width(0, name_width)
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
