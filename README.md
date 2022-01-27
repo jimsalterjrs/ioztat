@@ -47,8 +47,8 @@ optional arguments:
   -s {name,rps,wps,rMBps,wMBps}
                         sort by the specified field
   -T {u,d}              prefix each report with a Unix timestamp or formatted date
-  -y                    skip the initial "summary" report
   -V, --version         show program's version number and exit
+  -y                    skip the initial "summary" report
   -z                    suppress datasets with zero activity
   ````
 
