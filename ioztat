@@ -221,7 +221,10 @@ class Column:
         self.just = just
 
     def format(self, string):
-        return self.just(string, self.width)
+        if self.just:
+            return self.just(string, self.width)
+        else:
+            return string
 
 class ColumnGroup:
     def __init__(self, name, columns, width=0, just=str.center):
@@ -231,7 +234,10 @@ class ColumnGroup:
         self.just = just
 
     def format(self, string):
-        return self.just(string, self.width + sum([c.width for c in self.columns]))
+        if self.just:
+            return self.just(string, self.width + sum([c.width for c in self.columns]))
+        else:
+            return string
 
 class ColumnFormatter:
     def __init__(self, column_separator = '  ', row_separator = '-'):
@@ -268,7 +274,6 @@ class ColumnFormatter:
 class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
         self.columns.append(ColumnGroup(name, **args))
-
 
 sorts = {
     'name':  {'key': lambda x: x.name},
@@ -340,19 +345,28 @@ if not args.overwrite:
 
 NUM_NUMERIC_COLUMNS = 6
 
-field_width = 12 if args.exact else 6
-column_separator = "\t" if args.scripted else '  '
+if args.scripted:
+    column_separator = "\t"
+    name_just = None
+    num_just = None
+    field_width = 0
+else:
+    column_separator = '  '
+    name_just = str.ljust
+    num_just = str.rjust
+    field_width = 11 if args.exact else 5
+
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
-formatter.add_column('dataset', just=str.ljust)
+formatter.add_column('dataset', just=name_just)
 formatter.add_group()
-formatter.add_column('read', width=field_width, just=str.rjust)
-formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_column('read',  width=field_width, just=num_just)
+formatter.add_column('write', width=field_width, just=num_just)
 formatter.add_group('operations', 2)
-formatter.add_column('read', width=field_width, just=str.rjust)
-formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_column('read',  width=field_width, just=num_just)
+formatter.add_column('write', width=field_width, just=num_just)
 formatter.add_group('bandwidth', 2)
-formatter.add_column('read', width=field_width, just=str.rjust)
-formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_column('read',  width=field_width, just=num_just)
+formatter.add_column('write', width=field_width, just=num_just)
 formatter.add_group('opsize', 2)
 
 try:
