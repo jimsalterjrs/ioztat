@@ -30,7 +30,7 @@
 PROGRAM_VERSION = '1.1.0-dev'
 
 # In -p mode, indent each segment by this string
-PATH_INDENT = '   '
+PATH_INDENT = '  '
 
 import argparse
 import os
@@ -214,6 +214,62 @@ def format_dataset(path, limit, ellipsis = '...'):
         ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
     return ret
 
+class Column:
+    def __init__(self, name, width=0, just=str):
+        self.name = name
+        self.width = width
+        self.just = just
+
+    def format(self, string):
+        return self.just(string, self.width)
+
+class ColumnGroup:
+    def __init__(self, name, columns, width=0, just=str.center):
+        self.name = name
+        self.columns = columns
+        self.width = width
+        self.just = just
+
+    def format(self, string):
+        return self.just(string, self.width + sum([c.width for c in self.columns]))
+
+class ColumnFormatter:
+    def __init__(self, column_separator = '  ', row_separator = '-'):
+        self.columns = []
+        self.groups = None
+        self.column_separator = column_separator
+        self.row_separator = row_separator
+
+    def add_column(self, name, **args):
+        self.columns.append(Column(name, **args))
+
+    def add_group(self, name='', colspan=1, just=str.center):
+        if self.groups is None:
+            self.groups = ColumnGroupFormatter(column_separator=column_separator)
+
+        self.groups.add_column(name, columns=self.columns[-colspan:], width=len(self.column_separator) * (colspan - 1), just=just)
+
+    def set_width(self, column, width):
+        self.columns[column].width = width
+
+    def print_columns(self, columns):
+        formatted = [c.format(str(column)) for (c, column) in zip(self.columns, columns)]
+        print(self.column_separator.join(formatted))
+
+    def print_header(self):
+        if self.groups:
+            self.groups.print_header()
+
+        self.print_columns([c.name for c in self.columns])
+
+    def print_divider(self):
+        print(self.column_separator.join([self.row_separator * c.width for c in self.columns]))
+
+class ColumnGroupFormatter(ColumnFormatter):
+    def add_column(self, name, **args):
+        self.columns.append(ColumnGroup(name, **args))
+
+
 sorts = {
     'name':  {'key': lambda x: x.name},
     'rps':   {'key': lambda x: x.rps,   'reverse': True},
@@ -269,7 +325,6 @@ else:
 
 summary = next(filter_diff_iter(pools, dataset_pattern, False))
 max_name_width = max(map(lambda d: calc_name_width(d.name), summary), default=30)
-field_width = 12 if args.exact else 6
 
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 diff_loop = delay_iter(diff_loop, args.interval)
@@ -284,25 +339,21 @@ if not args.overwrite:
     diff_loop = filter(None, diff_loop)
 
 NUM_NUMERIC_COLUMNS = 6
-HEADER_GROUP_FORMAT = '{:{name_width}}' + ('  {:^{field_width}}' * 3)
-HEADER_FORMAT = '{:{name_width}}' + ('  {:>{field_width}}' * NUM_NUMERIC_COLUMNS)
-DIV_FORMAT = '{empty:-^{name_width}}' + ('  {empty:-^{field_width}}' * NUM_NUMERIC_COLUMNS)
 
-if args.scripted:
-    COLUMN_FORMAT = "\t".join(["{}"] * 7)
-else:
-    COLUMN_FORMAT = '{:{name_width}}' + ('  {:>{field_width}}' * NUM_NUMERIC_COLUMNS)
-
-def print_header(name_width, field_width):
-    print(HEADER_GROUP_FORMAT.format('', 'operations', 'bandwidth', 'opsize', name_width=name_width, field_width=field_width*2+2))
-    print(HEADER_FORMAT.format('dataset', 'read', 'write', 'read', 'write', 'read', 'write', name_width=name_width, field_width=field_width))
-    print_div(name_width, field_width)
-
-def print_div(name_width, field_width):
-    print(DIV_FORMAT.format(empty='', name_width=name_width, field_width=field_width))
-
-def print_columns(name_width, field_width, columns):
-    print(COLUMN_FORMAT.format(*columns, name_width=name_width, field_width=field_width))
+field_width = 12 if args.exact else 6
+column_separator = "\t" if args.scripted else '  '
+formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
+formatter.add_column('dataset', just=str.ljust)
+formatter.add_group()
+formatter.add_column('read', width=field_width, just=str.rjust)
+formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_group('operations', 2)
+formatter.add_column('read', width=field_width, just=str.rjust)
+formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_group('bandwidth', 2)
+formatter.add_column('read', width=field_width, just=str.rjust)
+formatter.add_column('write', width=field_width, just=str.rjust)
+formatter.add_group('opsize', 2)
 
 try:
     for index, diff in enumerate(diff_loop):
@@ -311,9 +362,12 @@ try:
         if args.sort != 'name':
             diff.sort(**sorts[args.sort])
 
+        # TODO: repeat headers based on height when connected to a tty
         width, _ = shutil.get_terminal_size()
-        avail_width = width - ((field_width + 2) * NUM_NUMERIC_COLUMNS)
+        avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
         name_width = max(10, min([avail_width, max_name_width]))
+        formatter.columns[0].width = name_width
+        # formatter.groups.columns[0].width = name_width
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
@@ -325,7 +379,8 @@ try:
             print(time.strftime('%c'))
 
         if (index == 0 or args.overwrite) and not args.scripted:
-            print_header(name_width, field_width)
+            formatter.print_header()
+            formatter.print_divider()
 
         last_path = []
         for d in diff:
@@ -352,10 +407,10 @@ try:
                     format_bytes(d.rareq_sz), format_bytes(d.wareq_sz)
                 )
 
-            print_columns(name_width, field_width, cols)
+            formatter.print_columns(cols)
 
         if not (args.scripted or args.overwrite):
-            print_div(name_width, field_width)
+            formatter.print_divider()
 
 except KeyboardInterrupt:
     print('')
