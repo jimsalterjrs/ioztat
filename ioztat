@@ -328,8 +328,7 @@ else:
 
 # Iterate over the full list to get a dataset column width
 if args.fullname:
-    def calc_name_width(path):
-        return len(path)
+    calc_name_width = len
 else:
     def calc_name_width(path):
         segments = path.split('/')
