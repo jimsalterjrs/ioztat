@@ -269,7 +269,7 @@ class ColumnFormatter:
         self.print_columns([c.name for c in self.columns])
 
     def print_divider(self):
-        print(self.column_separator.join([self.row_separator * c.width for c in self.columns]))
+        print(self.column_separator.join([''.ljust(c.width, self.row_separator) for c in self.columns]))
 
 class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
