@@ -26,8 +26,8 @@ ssd                                   0.00       0.00       0.00       0.00     
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-b] [-c COUNT] [-h] [-i INTERVAL] [-n] [-o] [-P | -p] [-s {name,rps,wps,rMBps,wMBps}]
-              [-T {u,d}] [-y] [-V] [-z]
+usage: ioztat [-b] [-c COUNT] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
+              [-s {name,rps,wps,rMBps,wMBps}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]]
 
 iostat for ZFS datasets
@@ -38,8 +38,11 @@ positional arguments:
 optional arguments:
   -b                    use binary (power-of-two) prefixes
   -c COUNT              number of reports generated
+  -e                    show exact values without truncation or scaling
+  -H                    scripted mode, skip headers and tab-separate
   -h, --help            show this help message and exit
   -i INTERVAL           interval between reports (in seconds)
+  -N                    display headers at most once
   -n                    do not recurse into child datasets
   -o                    overwrite old reports in terminal
   -P                    display dataset names on a single line
