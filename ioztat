@@ -354,7 +354,7 @@ else:
     column_separator = '  '
     name_just = str.ljust
     num_just = str.rjust
-    field_width = 11 if args.exact else 5
+    field_width = 11 if args.exact else 6
 
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
