@@ -262,7 +262,10 @@ class ColumnFormatter:
     def set_column_width(self, column, width):
         self.columns[column].width = width
 
-    def print_columns(self, columns):
+    def get_printed_width(self, start, stop=None):
+        return sum((c.width + len(self.column_separator) for c in self.columns[start:stop]))
+
+    def print_columns(self, *columns):
         formatted = (c.stringify(column) for (c, column) in zip(self.columns, columns))
         print(self.column_separator.join(formatted))
 
@@ -382,7 +385,7 @@ try:
             diff.sort(**SORTS[args.sort])
 
         width, height = shutil.get_terminal_size()
-        avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
+        avail_width = width - formatter.get_printed_width(1, 7)
         max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
         formatter.set_column_width(0, name_width)
@@ -404,7 +407,7 @@ try:
         last_path = []
         for d in diff:
             if args.fullname:
-                name = d.name
+                name = d.name if args.exact else format_dataset(d.name, name_width)
             else:
                 cur_path = d.name.split('/')
                 # Unmounted intermediate datasets can leave confusing gaps.
@@ -412,14 +415,16 @@ try:
                 # and print any missing intermediates.
                 common = os.path.commonprefix([last_path, cur_path])
                 for i, segment in enumerate(cur_path[len(common):-1]):
-                    print((PATH_INDENT * (len(common) + i)) + segment)
+                    name = (PATH_INDENT * (len(common) + i)) + segment
+                    if len(name) > name_width:
+                        name = ('+' + segment).rjust(name_width - 1)[:name_width]
+                    print(name)
                 name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
+                if len(name) > name_width:
+                    name = ('+' + cur_path[-1]).rjust(name_width - 1)[:name_width]
                 last_path = cur_path
 
-            formatter.print_columns((
-                name if args.exact else format_dataset(name, name_width),
-                d.rps, d.wps, d.rMBps, d.wMBps, d.rareq_sz, d.wareq_sz
-            ))
+            formatter.print_columns(name, d.rps, d.wps, d.rMBps, d.wMBps, d.rareq_sz, d.wareq_sz)
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
