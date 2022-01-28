@@ -255,8 +255,11 @@ class ColumnFormatter:
     def print(self, string, end="\n"):
         self.buffer.append(string + end)
 
-    def flush(self):
-        print(''.join(self.buffer), end='')
+    def flush(self, lines=None):
+        buffer = ''.join(self.buffer)
+        if lines:
+            buffer = "\n".join(buffer.split("\n", lines)[:lines])
+        print(buffer, end='')
         self.buffer.clear()
 
 class ColumnGroupFormatter(ColumnFormatter):
@@ -455,7 +458,7 @@ try:
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
 
-        formatter.flush()
+        formatter.flush(lines = height if args.overwrite else None)
 
 except KeyboardInterrupt:
     print('')
