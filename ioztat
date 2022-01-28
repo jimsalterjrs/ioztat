@@ -328,9 +328,6 @@ else:
         segments = path.split('/')
         return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
 
-summary = next(filter_diff_iter(pools, dataset_pattern, False))
-max_name_width = max(map(lambda d: calc_name_width(d.name), summary), default=30)
-
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 diff_loop = delay_iter(diff_loop, args.interval)
 
@@ -370,6 +367,8 @@ formatter.add_column('write', width=field_width, just=num_just)
 formatter.add_group('opsize', 2)
 
 try:
+    max_name_width = 0
+
     for index, diff in enumerate(diff_loop):
         # Always sort by name first, so the main sort has it as a secondary
         diff.sort(**sorts['name'])
@@ -379,6 +378,7 @@ try:
         # TODO: repeat headers based on height when connected to a tty
         width, _ = shutil.get_terminal_size()
         avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
+        max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
         formatter.set_column_width(0, name_width)
 
@@ -397,7 +397,6 @@ try:
 
         last_path = []
         for d in diff:
-            max_name_width = max(calc_name_width(d.name), max_name_width)
             if args.fullname:
                 name = d.name
             else:
