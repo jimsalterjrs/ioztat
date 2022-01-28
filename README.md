@@ -1,7 +1,7 @@
 # ioztat
 ioztat is a storage load analysis tool for OpenZFS. It provides iostat-like statistics at an individual dataset/zvol level.
 
-The statistics offered are read and write operations per second, read and write throughput per second, and the average size (in kilobytes) of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
+The statistics offered are read and write operations per second, read and write throughput per second, and the average size of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
 
 This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host:
 
@@ -27,7 +27,7 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 
 ````
 usage: ioztat [-b] [-c COUNT] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
-              [-s {name,rps,wps,rMBps,wMBps}] [-T {u,d}] [-V] [-y] [-z]
+              [-s {name,io,reads,writes,bytes,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]]
 
 iostat for ZFS datasets
@@ -47,7 +47,7 @@ optional arguments:
   -o                    overwrite old reports in terminal
   -P                    display dataset names on a single line
   -p                    display dataset names as an abbreviated tree
-  -s {name,rps,wps,rMBps,wMBps}
+  -s {name,io,reads,writes,bytes,nread,nwritten}
                         sort by the specified field
   -T {u,d}              prefix each report with a Unix timestamp or formatted date
   -V, --version         show program's version number and exit
