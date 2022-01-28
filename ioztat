@@ -294,19 +294,20 @@ def format_dataset(path, limit, ellipsis = '...'):
     return ret
 
 PATH_INDENT = '  '
+def indent_dataset_path(name, depth, limit):
+    """Indent name by depth PATH_INDENTS constrained by limit"""
+    if (len(PATH_INDENT) * depth) + len(name) > limit:
+        return ('+' + name).rjust(limit - 1)[:limit]
+    return (PATH_INDENT * depth) + name
+
 def print_format_dataset(name, last_path, limit):
     """Take a path, print any elements not in last_path, and return a formatted name"""
     cur_path = name.split('/')
     common = os.path.commonprefix([last_path, cur_path])
     for i, segment in enumerate(cur_path[len(common):-1]):
-        name = (PATH_INDENT * (len(common) + i)) + segment
-        if len(name) > limit:
-            name = ('+' + segment).rjust(limit - 1)[:limit]
-        print(name)
-    name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
-    if len(name) > limit:
-        name = ('+' + cur_path[-1]).rjust(limit - 1)[:limit]
-    return (name, cur_path)
+        print(indent_dataset_path(segment, len(common) + i, limit))
+
+    return (indent_dataset_path(cur_path[-1], len(cur_path) - 1, limit), cur_path)
 
 ################################################################################
 
