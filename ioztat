@@ -215,12 +215,16 @@ def format_dataset(path, limit, ellipsis = '...'):
     return ret
 
 class Column:
-    def __init__(self, name, width=0, just=str):
+    def __init__(self, name, width=0, format=str, just=None):
         self.name = name
         self.width = width
+        self.format = format
         self.just = just
 
-    def format(self, string):
+    def stringify(self, value):
+        return self.justify(str(self.format(value)))
+
+    def justify(self, string):
         if self.just:
             return self.just(string, self.width)
         else:
@@ -233,7 +237,7 @@ class ColumnGroup:
         self.width = width
         self.just = just
 
-    def format(self, string):
+    def justify(self, string):
         if self.just:
             return self.just(string, self.width + sum([c.width for c in self.columns]))
         else:
@@ -259,14 +263,15 @@ class ColumnFormatter:
         self.columns[column].width = width
 
     def print_columns(self, columns):
-        formatted = [c.format(str(column)) for (c, column) in zip(self.columns, columns)]
+        formatted = (c.stringify(column) for (c, column) in zip(self.columns, columns))
         print(self.column_separator.join(formatted))
 
     def print_header(self):
         if self.groups:
             self.groups.print_header()
 
-        self.print_columns([c.name for c in self.columns])
+        formatted = (column.justify(column.name) for column in self.columns)
+        print(self.column_separator.join(formatted))
 
     def print_divider(self):
         print(self.column_separator.join([''.ljust(c.width, self.row_separator) for c in self.columns]))
@@ -275,7 +280,7 @@ class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
         self.columns.append(ColumnGroup(name, **args))
 
-sorts = {
+SORTS = {
     'name':  {'key': lambda x: x.name},
     'rps':   {'key': lambda x: x.rps,   'reverse': True},
     'wps':   {'key': lambda x: x.wps,   'reverse': True},
@@ -298,15 +303,13 @@ parser.add_argument('-o', dest='overwrite', default=False, action='store_true', 
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-P', dest='fullname', default=None, action='store_true', help='display dataset names on a single line')
 group.add_argument('-p', dest='fullname', default=None, action='store_false', help='display dataset names as an abbreviated tree')
-parser.add_argument('-s', dest='sort', default='name', choices=sorts.keys(), help='sort by the specified field')
+parser.add_argument('-s', dest='sort', default='name', choices=SORTS.keys(), help='sort by the specified field')
 parser.add_argument('-T', dest='timestamp', default=False, choices=['u', 'd'], help='prefix each report with a Unix timestamp or formatted date')
 parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
 parser.add_argument('-y', dest='skip', default=0, action='store_const', const=1, help='skip the initial "summary" report')
 parser.add_argument('-z', dest='nonzero', default=False, action='store_true', help='suppress datasets with zero activity')
 
 args = parser.parse_args()
-
-format_bytes = lambda num: bytes_to_human(num, args.binaryprefix)
 
 # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
 if args.fullname is None:
@@ -354,17 +357,19 @@ else:
     num_just = str.rjust
     field_width = 11 if args.exact else 6
 
+format_bytes = round if args.exact else lambda num: bytes_to_human(num, args.binaryprefix)
+
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
 formatter.add_group()
-formatter.add_column('read',  width=field_width, just=num_just)
-formatter.add_column('write', width=field_width, just=num_just)
+formatter.add_column('read',  width=field_width, format=round, just=num_just)
+formatter.add_column('write', width=field_width, format=round, just=num_just)
 formatter.add_group('operations', 2)
-formatter.add_column('read',  width=field_width, just=num_just)
-formatter.add_column('write', width=field_width, just=num_just)
+formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
+formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
 formatter.add_group('bandwidth', 2)
-formatter.add_column('read',  width=field_width, just=num_just)
-formatter.add_column('write', width=field_width, just=num_just)
+formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
+formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
 formatter.add_group('opsize', 2)
 
 try:
@@ -372,9 +377,9 @@ try:
 
     for iteration, diff in enumerate(diff_loop):
         # Always sort by name first, so the main sort has it as a secondary
-        diff.sort(**sorts['name'])
+        diff.sort(**SORTS['name'])
         if args.sort != 'name':
-            diff.sort(**sorts[args.sort])
+            diff.sort(**SORTS[args.sort])
 
         width, height = shutil.get_terminal_size()
         avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
@@ -411,16 +416,10 @@ try:
                 name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
                 last_path = cur_path
 
-            if args.exact:
-                cols = (name, round(d.rps), round(d.wps), round(d.rMBps), round(d.wMBps), round(d.rareq_sz), round(d.wareq_sz))
-            else:
-                cols = (
-                    format_dataset(name, name_width), round(d.rps), round(d.wps),
-                    format_bytes(d.rMBps), format_bytes(d.wMBps),
-                    format_bytes(d.rareq_sz), format_bytes(d.wareq_sz)
-                )
-
-            formatter.print_columns(cols)
+            formatter.print_columns((
+                name if args.exact else format_dataset(name, name_width),
+                d.rps, d.wps, d.rMBps, d.wMBps, d.rareq_sz, d.wareq_sz
+            ))
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
