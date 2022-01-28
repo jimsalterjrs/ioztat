@@ -273,7 +273,7 @@ class ColumnFormatter:
         if self.groups:
             self.groups.print_header()
 
-        formatted = (column.justify(column.name) for column in self.columns)
+        formatted = (c.justify(c.name) for c in self.columns)
         print(self.column_separator.join(formatted))
 
     def print_divider(self):
