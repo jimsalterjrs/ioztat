@@ -334,20 +334,6 @@ else:
         segments = path.split('/')
         return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
 
-diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
-diff_loop = delay_iter(diff_loop, args.interval)
-
-if args.skip or args.count is not None:
-    import itertools
-    if args.count:
-        args.count += args.skip
-    diff_loop = itertools.islice(diff_loop, args.skip, args.count)
-
-if not args.overwrite:
-    diff_loop = filter(None, diff_loop)
-
-NUM_NUMERIC_COLUMNS = 6
-
 if args.scripted:
     column_separator = "\t"
     name_just = None
@@ -373,6 +359,18 @@ formatter.add_group('bandwidth', 2)
 formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
 formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
 formatter.add_group('opsize', 2)
+
+diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
+diff_loop = delay_iter(diff_loop, args.interval)
+
+if args.skip or args.count is not None:
+    import itertools
+    if args.count:
+        args.count += args.skip
+    diff_loop = itertools.islice(diff_loop, args.skip, args.count)
+
+if not args.overwrite:
+    diff_loop = filter(None, diff_loop)
 
 try:
     max_name_width = 0
