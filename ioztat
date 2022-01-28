@@ -310,14 +310,20 @@ def print_format_dataset(name, last_path, limit):
 ################################################################################
 
 SORTS = {
-    'name':  {'key': lambda x: x.name},
+    'name':     {'key': lambda x: x.name},
+    'reads':    {'key': lambda x: x.reads,    'reverse': True},
+    'writes':   {'key': lambda x: x.writes,   'reverse': True},
+    'nread':    {'key': lambda x: x.nread,    'reverse': True},
+    'nwritten': {'key': lambda x: x.nwritten, 'reverse': True},
+    'io':       {'key': lambda x: x.reads + x.writes,   'reverse': True},
+    'bytes':    {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
+
     'rps':   {'key': lambda x: x.reads,    'reverse': True},
     'wps':   {'key': lambda x: x.writes,   'reverse': True},
     'rMBps': {'key': lambda x: x.nread,    'reverse': True},
     'wMBps': {'key': lambda x: x.nwritten, 'reverse': True},
-    'ops':   {'key': lambda x: x.reads + x.writes, 'reverse': True},
-    'bw':    {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
 }
+SORT_DISPLAY = ['name', 'io', 'reads', 'writes', 'bytes', 'nread', 'nwritten']
 
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
@@ -334,7 +340,7 @@ parser.add_argument('-o', dest='overwrite', default=False, action='store_true', 
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-P', dest='fullname', default=None, action='store_true', help='display dataset names on a single line')
 group.add_argument('-p', dest='fullname', default=None, action='store_false', help='display dataset names as an abbreviated tree')
-parser.add_argument('-s', dest='sort', default='name', choices=SORTS.keys(), help='sort by the specified field')
+parser.add_argument('-s', dest='sort', default='name', choices=SORTS.keys(), metavar='{%s}' % ','.join(SORT_DISPLAY), help='sort by the specified field')
 parser.add_argument('-T', dest='timestamp', default=False, choices=['u', 'd'], help='prefix each report with a Unix timestamp or formatted date')
 parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
 parser.add_argument('-y', dest='skip', default=0, action='store_const', const=1, help='skip the initial "summary" report')
