@@ -48,10 +48,10 @@ class Dataset:
         if data:
             self.timestamp = int(data['timestamp'])
             self.name = data['dataset_name']
-            self.writes = int(data['writes'])
-            self.nwritten = int(data['nwritten'])
             self.reads = int(data['reads'])
             self.nread = int(data['nread'])
+            self.writes = int(data['writes'])
+            self.nwritten = int(data['nwritten'])
 
 ################################################################################
 # Platform specific section
@@ -128,24 +128,22 @@ class DatasetDiff:
     def __init__(self, old, new):
         self.name = new.name
         self.timediff = (new.timestamp - old.timestamp) / 1e9
-        self.wps = (new.writes - old.writes) / self.timediff
-        self.wMBps = (new.nwritten - old.nwritten) / self.timediff
-        self.rps = (new.reads - old.reads) / self.timediff
-        self.rMBps = (new.nread - old.nread) / self.timediff
+        self.reads = new.reads - old.reads
+        self.nread = new.nread - old.nread
+        self.writes = new.writes - old.writes
+        self.nwritten = new.nwritten - old.nwritten
+        self.rareq_sz = self.nread / self.reads if self.reads else 0
+        self.wareq_sz = self.nwritten / self.writes if self.writes else 0
 
-        try:
-            self.rareq_sz = (new.nread - old.nread) / (new.reads - old.reads)
-        except ZeroDivisionError:
-            self.rareq_sz = 0
-
-        try:
-            self.wareq_sz = (new.nwritten - old.nwritten) / (new.writes - old.writes)
-        except ZeroDivisionError:
-            self.wareq_sz = 0
+        if self.timediff:
+            self.reads /= self.timediff
+            self.nread /= self.timediff
+            self.writes /= self.timediff
+            self.nwritten /= self.timediff
 
     def nonzero(self):
         """True if this DatasetDiff has any non-zero deltas"""
-        return self.wps or self.wMBps or self.rps or self.rMBps
+        return self.reads or self.writes or self.nread or self.nwritten
 
 def calcDiff(prevdatasets, datasets):
     return [DatasetDiff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys()]
@@ -313,10 +311,12 @@ def print_format_dataset(name, last_path, limit):
 
 SORTS = {
     'name':  {'key': lambda x: x.name},
-    'rps':   {'key': lambda x: x.rps,   'reverse': True},
-    'wps':   {'key': lambda x: x.wps,   'reverse': True},
-    'rMBps': {'key': lambda x: x.rMBps, 'reverse': True},
-    'wMBps': {'key': lambda x: x.wMBps, 'reverse': True},
+    'rps':   {'key': lambda x: x.reads,    'reverse': True},
+    'wps':   {'key': lambda x: x.writes,   'reverse': True},
+    'rMBps': {'key': lambda x: x.nread,    'reverse': True},
+    'wMBps': {'key': lambda x: x.nwritten, 'reverse': True},
+    'ops':   {'key': lambda x: x.reads + x.writes, 'reverse': True},
+    'bw':    {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
 }
 
 # Keep this ordered alphabetically
@@ -436,7 +436,7 @@ try:
             else:
                 name, last_path = print_format_dataset(d.name, last_path, name_width)
 
-            formatter.print_columns(name, d.rps, d.wps, d.rMBps, d.wMBps, d.rareq_sz, d.wareq_sz)
+            formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
