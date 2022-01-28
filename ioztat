@@ -321,10 +321,10 @@ if args.fullname is None:
 pools = {dataset.split('/')[0] for dataset in args.dataset}
 if args.nonrecursive:
     # Make each match exact.
-    dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "\Z", sorted(args.dataset))))
+    dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "\Z" for ds in sorted(args.dataset))))
 else:
     # Accept either an exact match or one with an additional component
-    dataset_pattern = re.compile("|".join(map(lambda ds: "\A" + re.escape(ds) + "(?:\Z|/[^/]+)", sorted(args.dataset))))
+    dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
 # Iterate over the full list to get a dataset column width
 if args.fullname:
