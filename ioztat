@@ -372,13 +372,14 @@ else:
     num_just = str.rjust
     field_width = 11 if args.exact else 6
 
+format_iops = round if args.exact else lambda num: bytes_to_human(num, False)
 format_bytes = round if args.exact else lambda num: bytes_to_human(num, args.binaryprefix)
 
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
 formatter.add_group()
-formatter.add_column('read',  width=field_width, format=round, just=num_just)
-formatter.add_column('write', width=field_width, format=round, just=num_just)
+formatter.add_column('read',  width=field_width, format=format_iops, just=num_just)
+formatter.add_column('write', width=field_width, format=format_iops, just=num_just)
 formatter.add_group('operations', 2)
 formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
 formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
