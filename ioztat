@@ -29,9 +29,6 @@
 
 PROGRAM_VERSION = '1.1.0-dev'
 
-# In -p mode, indent each segment by this string
-PATH_INDENT = '  '
-
 import argparse
 import os
 import re
@@ -56,6 +53,11 @@ class Dataset:
             self.reads = int(data['reads'])
             self.nread = int(data['nread'])
 
+################################################################################
+# Platform specific section
+#
+# Must implement parseDatasets(pool?): dict(name: Dataset)
+################################################################################
 if sys.platform.startswith("linux"):
     import glob
 
@@ -120,6 +122,8 @@ else:
     print("Unsupported platform: " + sys.platform)
     exit(1)
 
+################################################################################
+
 class DatasetDiff:
     def __init__(self, old, new):
         self.name = new.name
@@ -181,38 +185,8 @@ def delay_iter(it, interval):
         yield item
         time.sleep(interval)
 
-# A more complete take on this is available here
-# https://stackoverflow.com/questions/12523586/python-format-size-application-converting-b-to-kb-mb-gb-tb/63839503#63839503
-SIZE_PREFIX = ['K', 'M', 'G', 'T', 'P', 'E']
-SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
-def bytes_to_human(num, binary=False):
-    div = 1024 if binary else 1000
-    step = div - 0.05
-
-    if num < div:
-        return '{:.0f}'.format(num)
-
-    num /= div
-
-    for p in range(len(SIZE_PREFIX)):
-        if num < step:
-            break
-        if p < SIZE_PREFIX_MAX:
-            num /= div
-
-    return '{:.1f}{}'.format(num, SIZE_PREFIX[p])
-
-def format_dataset(path, limit, ellipsis = '...'):
-    """Truncate a dataset name to a limit"""
-    if len(path) <= limit:
-        return path
-
-    # Always display the pool name
-    components = path.split('/', 1)
-    ret = components[0]
-    if len(components) > 1:
-        ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
-    return ret
+################################################################################
+# Column formatting
 
 class Column:
     def __init__(self, name, width=0, format=str, just=None):
@@ -282,6 +256,59 @@ class ColumnFormatter:
 class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
         self.columns.append(ColumnGroup(name, **args))
+
+################################################################################
+# General formatting
+
+# A more complete take on this is available here
+# https://stackoverflow.com/questions/12523586/python-format-size-application-converting-b-to-kb-mb-gb-tb/63839503#63839503
+SIZE_PREFIX = ['K', 'M', 'G', 'T', 'P', 'E']
+SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
+def bytes_to_human(num, binary=False):
+    div = 1024 if binary else 1000
+    step = div - 0.05
+
+    if num < div:
+        return '{:.0f}'.format(num)
+
+    num /= div
+
+    for p in range(len(SIZE_PREFIX)):
+        if num < step:
+            break
+        if p < SIZE_PREFIX_MAX:
+            num /= div
+
+    return '{:.1f}{}'.format(num, SIZE_PREFIX[p])
+
+def format_dataset(path, limit, ellipsis = '...'):
+    """Truncate a dataset name to a limit"""
+    if len(path) <= limit:
+        return path
+
+    # Always display the pool name
+    components = path.split('/', 1)
+    ret = components[0]
+    if len(components) > 1:
+        ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
+    return ret
+
+PATH_INDENT = '  '
+def print_format_dataset(name, last_path, limit):
+    """Take a path, print any elements not in last_path, and return a formatted name"""
+    cur_path = name.split('/')
+    common = os.path.commonprefix([last_path, cur_path])
+    for i, segment in enumerate(cur_path[len(common):-1]):
+        name = (PATH_INDENT * (len(common) + i)) + segment
+        if len(name) > limit:
+            name = ('+' + segment).rjust(limit - 1)[:limit]
+        print(name)
+    name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
+    if len(name) > limit:
+        name = ('+' + cur_path[-1]).rjust(limit - 1)[:limit]
+    return (name, cur_path)
+
+################################################################################
 
 SORTS = {
     'name':  {'key': lambda x: x.name},
@@ -406,20 +433,7 @@ try:
             if args.fullname:
                 name = d.name if args.exact else format_dataset(d.name, name_width)
             else:
-                cur_path = d.name.split('/')
-                # Unmounted intermediate datasets can leave confusing gaps.
-                # Find the longest shared segment with the previous path,
-                # and print any missing intermediates.
-                common = os.path.commonprefix([last_path, cur_path])
-                for i, segment in enumerate(cur_path[len(common):-1]):
-                    name = (PATH_INDENT * (len(common) + i)) + segment
-                    if len(name) > name_width:
-                        name = ('+' + segment).rjust(name_width - 1)[:name_width]
-                    print(name)
-                name = (PATH_INDENT * (len(cur_path) - 1)) + cur_path[-1]
-                if len(name) > name_width:
-                    name = ('+' + cur_path[-1]).rjust(name_width - 1)[:name_width]
-                last_path = cur_path
+                name, last_path = print_format_dataset(d.name, last_path, name_width)
 
             formatter.print_columns(name, d.rps, d.wps, d.rMBps, d.wMBps, d.rareq_sz, d.wareq_sz)
 
