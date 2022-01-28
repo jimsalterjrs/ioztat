@@ -216,19 +216,19 @@ class ColumnGroup:
             return string
 
 class ColumnFormatter:
-    def __init__(self, column_separator = '  ', row_separator = '-'):
+    def __init__(self, column_separator = '  ', row_separator = '-', buffer = []):
         self.columns = []
         self.groups = None
         self.column_separator = column_separator
         self.row_separator = row_separator
-        self.buffer = []
+        self.buffer = buffer
 
     def add_column(self, name, **args):
         self.columns.append(Column(name, **args))
 
     def add_group(self, name='', colspan=1, just=str.center):
         if self.groups is None:
-            self.groups = ColumnGroupFormatter(column_separator=column_separator)
+            self.groups = ColumnGroupFormatter(column_separator=column_separator, buffer=self.buffer)
 
         self.groups.add_column(name, columns=self.columns[-colspan:], width=len(self.column_separator) * (colspan - 1), just=just)
 
