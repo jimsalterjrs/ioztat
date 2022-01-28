@@ -221,6 +221,7 @@ class ColumnFormatter:
         self.groups = None
         self.column_separator = column_separator
         self.row_separator = row_separator
+        self.buffer = []
 
     def add_column(self, name, **args):
         self.columns.append(Column(name, **args))
@@ -239,17 +240,24 @@ class ColumnFormatter:
 
     def print_columns(self, *columns):
         formatted = (c.stringify(column) for (c, column) in zip(self.columns, columns))
-        print(self.column_separator.join(formatted))
+        self.print(self.column_separator.join(formatted))
 
     def print_header(self):
         if self.groups:
             self.groups.print_header()
 
         formatted = (c.justify(c.name) for c in self.columns)
-        print(self.column_separator.join(formatted))
+        self.print(self.column_separator.join(formatted))
 
     def print_divider(self):
-        print(self.column_separator.join([''.ljust(c.width, self.row_separator) for c in self.columns]))
+        self.print(self.column_separator.join([''.ljust(c.width, self.row_separator) for c in self.columns]))
+
+    def print(self, string, end="\n"):
+        self.buffer.append(string + end)
+
+    def flush(self):
+        print(''.join(self.buffer), end='')
+        self.buffer.clear()
 
 class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
@@ -298,7 +306,7 @@ def indent_dataset_path(name, depth, limit):
         return ('+' + name).rjust(limit - 1)[:limit]
     return (PATH_INDENT * depth) + name
 
-def print_format_dataset(name, last_path, limit):
+def print_format_dataset(name, last_path, limit, print=print):
     """Take a path, print any elements not in last_path, and return a formatted name"""
     cur_path = name.split('/')
     common = os.path.commonprefix([last_path, cur_path])
@@ -323,7 +331,7 @@ SORTS = {
     'rMBps': {'key': lambda x: x.nread,    'reverse': True},
     'wMBps': {'key': lambda x: x.nwritten, 'reverse': True},
 }
-SORT_DISPLAY = ['name', 'io', 'reads', 'writes', 'bytes', 'nread', 'nwritten']
+SORT_DISPLAY = ('name', 'io', 'reads', 'writes', 'bytes', 'nread', 'nwritten')
 
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
@@ -423,12 +431,12 @@ try:
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
-            print("\033[2J\033[1;1H", end = '')
+            formatter.print("\033[2J\033[1;1H", end = '')
 
         if args.timestamp == 'u':
-            print(int(time.time()))
+            formatter.print(int(time.time()))
         elif args.timestamp == 'd':
-            print(time.strftime('%c'))
+            formatter.print(time.strftime('%c'))
 
         if (not args.scripted) and (args.overwrite or iteration == 0 or
             ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
@@ -440,12 +448,14 @@ try:
             if args.fullname:
                 name = d.name if args.exact else format_dataset(d.name, name_width)
             else:
-                name, last_path = print_format_dataset(d.name, last_path, name_width)
+                name, last_path = print_format_dataset(d.name, last_path, name_width, print=formatter.print)
 
             formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
+
+        formatter.flush()
 
 except KeyboardInterrupt:
     print('')
