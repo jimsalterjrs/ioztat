@@ -292,6 +292,7 @@ parser.add_argument('-e', dest='exact', default=False, action='store_true', help
 parser.add_argument('-H', dest='scripted', default=False, action='store_true', help='scripted mode, skip headers and tab-separate')
 parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
 parser.add_argument('-i', dest='interval', default=1, type=float, help='interval between reports (in seconds)')
+parser.add_argument('-N', dest='headeronce', default=False, action='store_true', help='display headers at most once')
 parser.add_argument('-n', dest='nonrecursive', default=False, action='store_true', help='do not recurse into child datasets')
 parser.add_argument('-o', dest='overwrite', default=False, action='store_true', help='overwrite old reports in terminal')
 group = parser.add_mutually_exclusive_group()
@@ -369,14 +370,13 @@ formatter.add_group('opsize', 2)
 try:
     max_name_width = 0
 
-    for index, diff in enumerate(diff_loop):
+    for iteration, diff in enumerate(diff_loop):
         # Always sort by name first, so the main sort has it as a secondary
         diff.sort(**sorts['name'])
         if args.sort != 'name':
             diff.sort(**sorts[args.sort])
 
-        # TODO: repeat headers based on height when connected to a tty
-        width, _ = shutil.get_terminal_size()
+        width, height = shutil.get_terminal_size()
         avail_width = width - ((field_width + len(column_separator)) * NUM_NUMERIC_COLUMNS)
         max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
@@ -391,7 +391,8 @@ try:
         elif args.timestamp == 'd':
             print(time.strftime('%c'))
 
-        if (index == 0 or args.overwrite) and not args.scripted:
+        if (not args.scripted) and (args.overwrite or iteration == 0 or
+            ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
             formatter.print_header()
             formatter.print_divider()
 
