@@ -1,33 +1,35 @@
 # ioztat
 ioztat is a storage load analysis tool for OpenZFS. It provides iostat-like statistics at an individual dataset/zvol level.
 
-The statistics offered are read and write operations per second, read and write throughput per second, and the average size (in kilobytes) of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
+The statistics offered are read and write operations per second, read and write throughput per second, and the average size of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
 
 This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host:
 
 ````
 root@redacted-prod0:~# ioztat -y -c1 ssd
-dataset                               w/s      wMB/s        r/s      rMB/s   wareq-sz   rareq-sz
-ssd                                   0.00       0.00       0.00       0.00       0.00       0.00
-   images                             0.00       0.00       0.00       0.00       0.00       0.00
-      DC1                            17.96       0.10       3.99       0.05       5.66      12.29
-      DC2                            21.95       0.14       0.00       0.00       6.59       0.00
-      QB                              2.00       0.01       0.00       0.00       7.17       0.00
-      SAP-TC                          2.99       0.02       0.00       0.00       6.83       0.00
-      SAP4-WIN2019                    2.99       0.05       0.00       0.00      17.07       0.00
-      nagios                          0.00       0.00       0.00       0.00       0.00       0.00
-      qemu                            0.00       0.00       0.00       0.00       0.00       0.00
-         autostart                    0.00       0.00       0.00       0.00       0.00       0.00
-   iso                                0.00       0.00       0.00       0.00       0.00       0.00
-   unsnapped                          0.00       0.00       0.00       0.00       0.00       0.00
-      rp9                             0.00       0.00       0.00       0.00       0.00       0.00
+                    operations      bandwidth         opsize
+dataset             read   write    read   write    read   write
+----------------  ------  ------  ------  ------  ------  ------
+ssd                    0       0       0       0       0       0
+  images               0       0       0       0       0       0
+    DC1                4      18   49.0K   98.0K   12.5K    5.6K
+    DC2                0      22       0  137.3K       0    6.4K
+    QB                 0       2       0    9.8K       0    5.0K
+    SAP-TC             0       3       0   19.6K       0    6.7K
+    SAP4-WIN2019       0       3       0   49.0K       0   16.7K
+    nagios             0       0       0       0       0       0
+    qemu               0       0       0       0       0       0
+      autostart        0       0       0       0       0       0
+  iso                  0       0       0       0       0       0
+  unsnapped            0       0       0       0       0       0
+    rp9                0       0       0       0       0       0
 ````
 
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-b] [-c COUNT] [-h] [-i INTERVAL] [-n] [-o] [-P | -p] [-s {name,rps,wps,rMBps,wMBps}]
-              [-T {u,d}] [-y] [-V] [-z]
+usage: ioztat [-b] [-c COUNT] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
+              [-s {name,operations,reads,writes,bandwidth,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]]
 
 iostat for ZFS datasets
@@ -38,13 +40,16 @@ positional arguments:
 optional arguments:
   -b                    use binary (power-of-two) prefixes
   -c COUNT              number of reports generated
+  -e                    show exact values without truncation or scaling
+  -H                    scripted mode, skip headers and tab-separate
   -h, --help            show this help message and exit
   -i INTERVAL           interval between reports (in seconds)
+  -N                    display headers at most once
   -n                    do not recurse into child datasets
   -o                    overwrite old reports in terminal
   -P                    display dataset names on a single line
   -p                    display dataset names as an abbreviated tree
-  -s {name,rps,wps,rMBps,wMBps}
+  -s {name,operations,reads,writes,bandwidth,nread,nwritten}
                         sort by the specified field
   -T {u,d}              prefix each report with a Unix timestamp or formatted date
   -V, --version         show program's version number and exit
