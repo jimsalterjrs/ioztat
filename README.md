@@ -7,20 +7,22 @@ This sample output shows activity which has taken place in the most recent secon
 
 ````
 root@redacted-prod0:~# ioztat -y -c1 ssd
-dataset                               w/s      wMB/s        r/s      rMB/s   wareq-sz   rareq-sz
-ssd                                   0.00       0.00       0.00       0.00       0.00       0.00
-   images                             0.00       0.00       0.00       0.00       0.00       0.00
-      DC1                            17.96       0.10       3.99       0.05       5.66      12.29
-      DC2                            21.95       0.14       0.00       0.00       6.59       0.00
-      QB                              2.00       0.01       0.00       0.00       7.17       0.00
-      SAP-TC                          2.99       0.02       0.00       0.00       6.83       0.00
-      SAP4-WIN2019                    2.99       0.05       0.00       0.00      17.07       0.00
-      nagios                          0.00       0.00       0.00       0.00       0.00       0.00
-      qemu                            0.00       0.00       0.00       0.00       0.00       0.00
-         autostart                    0.00       0.00       0.00       0.00       0.00       0.00
-   iso                                0.00       0.00       0.00       0.00       0.00       0.00
-   unsnapped                          0.00       0.00       0.00       0.00       0.00       0.00
-      rp9                             0.00       0.00       0.00       0.00       0.00       0.00
+                    operations      bandwidth         opsize
+dataset             read   write    read   write    read   write
+----------------  ------  ------  ------  ------  ------  ------
+ssd                    0       0       0       0       0       0
+  images               0       0       0       0       0       0
+    DC1                4      18   49.0K   98.0K   12.5K    5.6K
+    DC2                0      22       0  137.3K       0    6.4K
+    QB                 0       2       0    9.8K       0    5.0K
+    SAP-TC             0       3       0   19.6K       0    6.7K
+    SAP4-WIN2019       0       3       0   49.0K       0   16.7K
+    nagios             0       0       0       0       0       0
+    qemu               0       0       0       0       0       0
+      autostart        0       0       0       0       0       0
+  iso                  0       0       0       0       0       0
+  unsnapped            0       0       0       0       0       0
+    rp9                0       0       0       0       0       0
 ````
 
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
