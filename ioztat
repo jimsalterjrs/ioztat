@@ -345,23 +345,39 @@ for name, aliases in SORT_ALIAS.items():
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
 parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
-parser.add_argument('-b', dest='binaryprefix', action='store_true', help='use binary (power-of-two) prefixes')
-parser.add_argument('-c', dest='count', type=int, help='number of reports generated')
-parser.add_argument('-e', dest='exact', action='store_true', help='show exact values without truncation or scaling')
-parser.add_argument('-H', dest='scripted', action='store_true', help='scripted mode, skip headers and tab-separate')
-parser.add_argument('-h', '--help', action='help', help='show this help message and exit')
-parser.add_argument('-i', dest='interval', default=1, type=float, help='interval between reports (in seconds)')
-parser.add_argument('-N', dest='headeronce', action='store_true', help='display headers at most once')
-parser.add_argument('-n', dest='nonrecursive', action='store_true', help='do not recurse into child datasets')
-parser.add_argument('-o', dest='overwrite', action='store_true', help='overwrite old reports in terminal')
+parser.add_argument('-b', dest='binaryprefix', action='store_true',
+                          help='use binary (power-of-two) prefixes')
+parser.add_argument('-c', dest='count', type=int,
+                          help='number of reports generated')
+parser.add_argument('-e', dest='exact', action='store_true',
+                          help='show exact values without truncation or scaling')
+parser.add_argument('-H', dest='scripted', action='store_true',
+                          help='scripted mode, skip headers and tab-separate')
+parser.add_argument('-h', '--help', action='help',
+                          help='show this help message and exit')
+parser.add_argument('-i', dest='interval', type=float, default=1,
+                          help='interval between reports (in seconds)')
+parser.add_argument('-N', dest='headeronce', action='store_true',
+                          help='display headers at most once')
+parser.add_argument('-n', dest='nonrecursive', action='store_true',
+                          help='do not recurse into child datasets')
+parser.add_argument('-o', dest='overwrite', action='store_true',
+                          help='overwrite old reports in terminal')
 group = parser.add_mutually_exclusive_group()
-group.add_argument('-P', dest='fullname', default=None, action='store_true', help='display dataset names on a single line')
-group.add_argument('-p', dest='fullname', default=None, action='store_false', help='display dataset names as an abbreviated tree')
-parser.add_argument('-s', dest='sort', type=str.lower, default='name', choices=SORTS.keys(), metavar='{%s}' % ','.join(SORT_DISPLAY), help='sort by the specified field')
-parser.add_argument('-T', dest='timestamp', choices=['u', 'd'], help='prefix each report with a Unix timestamp or formatted date')
+group.add_argument('-P', dest='fullname', action='store_true', default=None,
+                         help='display dataset names on a single line')
+group.add_argument('-p', dest='fullname', action='store_false', default=None,
+                         help='display dataset names as an abbreviated tree')
+parser.add_argument('-s', dest='sort', type=str.lower, default='name',
+                          choices=SORTS.keys(), metavar='{%s}' % ','.join(SORT_DISPLAY),
+                          help='sort by the specified field')
+parser.add_argument('-T', dest='timestamp', choices=['u', 'd'],
+                          help='prefix each report with a Unix timestamp or formatted date')
 parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
-parser.add_argument('-y', dest='skip', default=0, action='store_const', const=1, help='skip the initial "summary" report')
-parser.add_argument('-z', dest='nonzero', action='store_true', help='suppress datasets with zero activity')
+parser.add_argument('-y', dest='skip', action='store_const', default=0, const=1,
+                          help='skip the initial "summary" report')
+parser.add_argument('-z', dest='nonzero', action='store_true',
+                          help='suppress datasets with zero activity')
 
 args = parser.parse_args()
 
