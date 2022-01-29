@@ -7,12 +7,18 @@
 .Nd display logical I/O statistics for ZFS datasets
 .Sh SYNOPSIS
 .Nm
-.Op Fl beHhNnoVyz
+.Fl V | Fl -version
+.
+.Nm
+.Fl h | Fl -help
+.
+.Nm
+.Op Fl beHNnoyz
 .Op Fl c Ar count
 .Op Fl i Ar interval
 .Op Fl T Ar u Ns | Ns d
-.Op Fl s Ar name Ns | Ns operations Ns | Ns reads Ns | Ns writes Ns | Ns bandwidth Ns | Ns nread Ns | Ns nwritten
-.Op Ns dataset Ns … Ns
+.Op Fl s Ar name Ns | Ns Ar operations Ns | Ns Ar reads Ns | Ns Ar writes Ns | Ns Ar bandwidth Ns | Ns Ar nread Ns | Ns Ar nwritten
+.Op Ar dataset ...
 .
 .Sh DESCRIPTION
 The
