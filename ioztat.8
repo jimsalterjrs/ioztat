@@ -1,0 +1,131 @@
+.Dd January 29, 2022
+.Dt IOZTAT 8
+.Os
+.
+.Sh NAME
+.Nm ioztat
+.Nd display logical I/O statistics for ZFS datasets
+.Sh SYNOPSIS
+.Nm
+.Op Fl beHhNnoVyz
+.Op Fl c Ar count
+.Op Fl i Ar interval
+.Op Fl T Ar u Ns | Ns d
+.Op Fl s Ar name Ns | Ns operations Ns | Ns reads Ns | Ns writes Ns | Ns bandwidth Ns | Ns nread Ns | Ns nwritten
+.Op Ns dataset Ns … Ns
+.
+.Sh DESCRIPTION
+The
+.Nm
+utility displays logical I/O statistics for individual ZFS datasets.
+The first report is averaged over the system uptime, followed by reports averaged
+over the reporting
+.Ar interval ,
+one second by default.
+The initial summary may be suppressed with the
+.Fl y
+option.
+.Pp
+Underlying device I/O depends on pool and dataset configuration.
+See
+.Xr zpool-iostat 8
+and
+.Xr iostat 8
+for reporting on these values.
+.Pp
+To filter output you may pass in a list of datasets.
+If no datasets are specified, statistics for every mounted dataset in the system are shown.
+If the
+.Fl n
+option is given, child datasets are not included for any specified dataset unless they are
+also directly specified.
+.Pp
+The options are as follows:
+.Bl -tag -width flag
+.It Fl b
+Display formatted byte sizes using SI binary prefixes instead of decimal.
+.It Fl c
+Display
+.Ar count
+reports and exit.
+If no repeat
+.Ar count
+is specified, the default is infinity.
+.It Fl e
+Display exact values, without truncating dataset names (unless
+.Fl p
+is given) or formatting numeric output.
+.It Fl H
+Scripted mode, skip headers and tab-separate fields instead of using arbitrary whitespace.
+.It Fl h | Fl -help
+Display help text and exit.
+.It Fl i
+Pause
+.Ar interval
+seconds between reports.
+If no
+.Ar interval
+is specified the default is 1 second.
+.Pp
+The
+.Nm
+command will accept non-integer intervals, but it should be noted the reporting interval
+is not exact.
+.It Fl N
+Display headers only once, instead of periodically repeating them.
+.It Fl n
+Omit children of any specified datasets that haven't themselves been explicitly specified.
+.It Fl o
+Overwrite mode.
+Before each report, clear the screen and print only as many lines as will fit.
+.It Fl P
+Display dataset names on a single line.
+.It Fl p
+Display dataset names as an indented tree spread across multiple lines.
+These options override
+defaults that may be applied by different sorting and display modes.
+.It Fl s
+Sort each report by the specified order.
+Defaults to
+.Ar name .
+.It Fl T Ar u Ns | Ns d
+Before each report, display a timestamp.
+Specify
+.Ar u
+for a numeric Unix timestamp in seconds since the epoch, or
+.Ar d
+for a formatted date-time.
+.It Fl V | Fl -version
+Display the current version of
+.Nm
+and exit.
+.It Fl y
+Omit statistics since boot.
+This suppresses output for the first
+.Ar interval
+seconds.
+.It Fl z
+Omit datasets which have no activity.
+.El
+.Sh EXAMPLES
+.Dl ioztat -z rpool/USERDATA
+.Pp
+Display statistics for any mounted datasets within rpool/USERDATA which have activity.
+.Pp
+.Dl ioztat -zoTd -i5 -s operations
+.Pp
+Display statistics for all mounted datasets with activity across five second intervals,
+ordered by total read and write operations, limited by available display and overwriting
+prior reports in a manner similar to
+.Xr top 1 .
+.Pp
+.Dl ioztat -Heyc1
+.Pp
+Display a single report for all mounted datasets in a machine-readable manner with out
+headers, tab-delimited fields, exact values, and omitting the initial summary report.
+.Sh SEE ALSO
+.Xr iostat 8 ,
+.Xr zfs 8 ,
+.Xr zpool-iostat 8
+.Sh BUGS
+Please report any issues at https://github.com/jimsalterjrs/ioztat/issues
