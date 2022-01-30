@@ -7,22 +7,24 @@ This sample output shows activity which has taken place in the most recent secon
 
 ````
 root@redacted-prod0:~# ioztat -y -c1 ssd
-                    operations      bandwidth         opsize
-dataset             read   write    read   write    read   write
-----------------  ------  ------  ------  ------  ------  ------
-ssd                    0       0       0       0       0       0
-  images               0       0       0       0       0       0
-    DC1                4      18   49.0K   98.0K   12.5K    5.6K
-    DC2                0      22       0  137.3K       0    6.4K
-    QB                 0       2       0    9.8K       0    5.0K
-    SAP-TC             0       3       0   19.6K       0    6.7K
-    SAP4-WIN2019       0       3       0   49.0K       0   16.7K
-    nagios             0       0       0       0       0       0
-    qemu               0       0       0       0       0       0
-      autostart        0       0       0       0       0       0
-  iso                  0       0       0       0       0       0
-  unsnapped            0       0       0       0       0       0
-    rp9                0       0       0       0       0       0
+                   operations    bandwidth       opsize
+dataset            read  write   read  write   read  write
+----------------  -----  -----  -----  -----  -----  -----
+ssd                   0      0      0      0      0      0
+  images              0      0      0      0      0      0
+    DC1               4     18  49.0K  98.0K  12.5K  5.56K
+    DC2               0     22      0   137K      0  6.36K
+    QB                0      2      0  9.80K      0  5.00K
+    SAP-TC            0      3      0  19.6K      0  6.67K
+    SAP4-WIN2019      0      3      0  49.0K      0  16.7K
+    nagios            0      0      0      0      0      0
+    qemu              0      0      0      0      0      0
+      autostart       0      0      0      0      0      0
+  iso                 0      0      0      0      0      0
+  unsnapped           0      0      0      0      0      0
+    rp9               0      0      0      0      0      0
+----------------  -----  -----  -----  -----  -----  -----
+
 ````
 
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.

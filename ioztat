@@ -30,6 +30,7 @@
 PROGRAM_VERSION = '2.0.0-dev'
 
 import argparse
+import math
 import os
 import re
 import shutil
@@ -269,26 +270,40 @@ class ColumnGroupFormatter(ColumnFormatter):
 ################################################################################
 # General formatting
 
-# A more complete take on this is available here
-# https://stackoverflow.com/questions/12523586/python-format-size-application-converting-b-to-kb-mb-gb-tb/63839503#63839503
-SIZE_PREFIX = ['K', 'M', 'G', 'T', 'P', 'E']
+SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
 SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
-def bytes_to_human(num, binary=False):
-    div = 1024 if binary else 1000
-    step = div - 0.05
+THRESHOLD_BY_PRECISION_1000 = [1000 - x for x in (0.5, 0.05, 0.005)]
+THRESHOLD_BY_PRECISION_1024 = [1024 - x for x in (0.5, 0.05, 0.005)]
+
+def number_to_human(num, length, binary = False):
+    """Format a number to a SI decimal or binary string representation that
+    should fit within length bytes"""
+    if binary:
+        div = 1024
+        thresholds = THRESHOLD_BY_PRECISION_1024
+    else:
+        div = 1000
+        thresholds = THRESHOLD_BY_PRECISION_1000
 
     if num < div:
-        return '{:.0f}'.format(num)
+        return str(round(num))
 
-    num /= div
+    index = 0
+    while num > div and index < SIZE_PREFIX_MAX:
+        num /= div
+        index += 1
 
-    for p in range(len(SIZE_PREFIX)):
-        if num < step:
-            break
-        if p < SIZE_PREFIX_MAX:
-            num /= div
+    # Calculate the number of decimal places we're about to print, and check
+    # we shouldn't round up to the next prefix instead. e.g:
+    # 999950 (1MB-50) becomes 1.00M instead of 1000.0K
+    # 1073217536 (1GiB-512KiB) becomes 1.00G instead of 1024M
+    precision = min(2, max(0, length - (math.ceil(math.log10(num)) + 2)))
+    if num >= thresholds[precision] and index != SIZE_PREFIX_MAX:
+        num /= div
+        index += 1
+        precision = min(2, max(0, length - (math.ceil(math.log10(num)) + 2)))
 
-    return '{:.1f}{}'.format(num, SIZE_PREFIX[p])
+    return "{:.{width}f}{}".format(num, SIZE_PREFIX[index], width=precision)
 
 def format_dataset(path, limit, ellipsis = '+'):
     """Truncate a dataset name to a limit"""
@@ -409,10 +424,10 @@ else:
     column_separator = '  '
     name_just = str.ljust
     num_just = str.rjust
-    field_width = 11 if args.exact else 6
+    field_width = 11 if args.exact else 5
 
-format_iops = round if args.exact else lambda num: bytes_to_human(num, False)
-format_bytes = round if args.exact else lambda num: bytes_to_human(num, args.binaryprefix)
+format_iops = round if args.exact else lambda num: number_to_human(num, field_width)
+format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.binaryprefix)
 
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
