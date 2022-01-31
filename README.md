@@ -31,7 +31,7 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 
 ````
 usage: ioztat [-b] [-c COUNT] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
-              [-s {name,operations,reads,writes,bandwidth,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
+              [-s {name,operations,reads,writes,throughput,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]]
 
 iostat for ZFS datasets
@@ -51,7 +51,7 @@ optional arguments:
   -o                    overwrite old reports in terminal
   -P                    display dataset names on a single line
   -p                    display dataset names as an abbreviated tree
-  -s {name,operations,reads,writes,bandwidth,nread,nwritten}
+  -s {name,operations,reads,writes,throughput,nread,nwritten}
                         sort by the specified field
   -T {u,d}              prefix each report with a Unix timestamp or formatted date
   -V, --version         show program's version number and exit

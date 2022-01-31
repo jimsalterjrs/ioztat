@@ -274,6 +274,7 @@ SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
 POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
 POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
 FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
+
 def number_to_human(num, length, binary = False):
     """Format a number to a SI decimal or binary string representation that
     should fit within length bytes"""
@@ -336,7 +337,7 @@ SORTS = {
     'operations': {'key': lambda x: x.reads + x.writes,   'reverse': True},
     'reads':      {'key': lambda x: x.reads,              'reverse': True},
     'writes':     {'key': lambda x: x.writes,             'reverse': True},
-    'bandwidth':  {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
+    'throughput': {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
     'nread':      {'key': lambda x: x.nread,              'reverse': True},
     'nwritten':   {'key': lambda x: x.nwritten,           'reverse': True},
 }
@@ -345,7 +346,7 @@ SORT_ALIAS = {
     'operations': ['io', 'ops', 'iops'],
     'reads': ['read', 'rps'],
     'writes': ['write', 'wps'],
-    'bandwidth': ['throughput'],
+    'throughput': ['bandwidth'],
     'nread': ['nreads', 'rmbps'],
     'nwritten': ['nwrite', 'nwrites', 'wmbps'],
 }
@@ -433,7 +434,7 @@ formatter.add_column('write', width=field_width, format=format_iops, just=num_ju
 formatter.add_group('operations', 2)
 formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
 formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
-formatter.add_group('bandwidth', 2)
+formatter.add_group('throughput', 2)
 formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
 formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
 formatter.add_group('opsize', 2)
