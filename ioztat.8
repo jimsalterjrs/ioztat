@@ -13,7 +13,7 @@
 .Fl h | Fl -help
 .
 .Nm
-.Op Fl beHNnoyz
+.Op Fl DeHNnoyz
 .Op Fl c Ar count
 .Op Fl i Ar interval
 .Op Fl T Ar u Ns | Ns d
@@ -48,8 +48,8 @@ also directly specified.
 .Pp
 The options are as follows:
 .Bl -tag -width flag
-.It Fl b
-Display formatted byte sizes using SI binary prefixes instead of decimal.
+.It Fl D
+Display formatted byte sizes using decimal powers of 1000 instead of powers of 1024.
 .It Fl c
 Display
 .Ar count

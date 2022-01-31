@@ -30,7 +30,7 @@ ssd                   0      0      0      0      0      0
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-b] [-c COUNT] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
+usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
               [-s {name,operations,reads,writes,throughput,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]]
 
@@ -40,8 +40,8 @@ positional arguments:
   dataset               ZFS dataset
 
 optional arguments:
-  -b                    use binary (power-of-two) prefixes
   -c COUNT              number of reports generated
+  -D                    display bytes in decimal powers of 1000 instead of 1024
   -e                    show exact values without truncation or scaling
   -H                    scripted mode, skip headers and tab-separate
   -h, --help            show this help message and exit

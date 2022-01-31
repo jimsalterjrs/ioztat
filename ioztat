@@ -275,15 +275,15 @@ POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
 POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
 FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
 
-def number_to_human(num, length, binary = False):
+def number_to_human(num, length, decimal = False):
     """Format a number to a SI decimal or binary string representation that
     should fit within length bytes"""
-    if binary:
-        divisor = 1024
-        powers = POWERS_1024
-    else:
+    if decimal:
         divisor = 1000
         powers = POWERS_1000
+    else:
+        divisor = 1024
+        powers = POWERS_1024
 
     n = num
     index = 0
@@ -357,10 +357,10 @@ for name, aliases in SORT_ALIAS.items():
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
 parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
-parser.add_argument('-b', dest='binaryprefix', action='store_true',
-                          help='use binary (power-of-two) prefixes')
 parser.add_argument('-c', dest='count', type=int,
                           help='number of reports generated')
+parser.add_argument('-D', dest='decimal', action='store_true',
+                          help='display bytes in decimal powers of 1000 instead of 1024')
 parser.add_argument('-e', dest='exact', action='store_true',
                           help='show exact values without truncation or scaling')
 parser.add_argument('-H', dest='scripted', action='store_true',
@@ -423,8 +423,8 @@ else:
     num_just = str.rjust
     field_width = 11 if args.exact else 5
 
-format_iops = round if args.exact else lambda num: number_to_human(num, field_width)
-format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.binaryprefix)
+format_iops = round if args.exact else lambda num: number_to_human(num, field_width, True)
+format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.decimal)
 
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
