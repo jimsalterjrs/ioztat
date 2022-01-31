@@ -30,7 +30,6 @@
 PROGRAM_VERSION = '2.0.0-dev'
 
 import argparse
-import math
 import os
 import re
 import shutil
@@ -297,11 +296,11 @@ def number_to_human(num, length, binary = False):
     # we shouldn't round up to the next prefix instead. e.g:
     # 999950 (1MB-50) becomes 1.00M instead of 1000.0K
     # 1073217536 (1GiB-512KiB) becomes 1.00G instead of 1024M
-    precision = min(2, max(0, length - (math.ceil(math.log10(num)) + 2)))
+    precision = min(2, max(0, length - (len(str(round(num))) + 2)))
     if num >= thresholds[precision] and index != SIZE_PREFIX_MAX:
         num /= div
         index += 1
-        precision = min(2, max(0, length - (math.ceil(math.log10(num)) + 2)))
+        precision = min(2, max(0, length - (len(str(round(num))) + 2)))
 
     return "{:.{width}f}{}".format(num, SIZE_PREFIX[index], width=precision)
 
