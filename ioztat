@@ -271,38 +271,35 @@ class ColumnGroupFormatter(ColumnFormatter):
 
 SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
 SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
-THRESHOLD_BY_PRECISION_1000 = [1000 - x for x in (0.5, 0.05, 0.005)]
-THRESHOLD_BY_PRECISION_1024 = [1024 - x for x in (0.5, 0.05, 0.005)]
-
+POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
+POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
+FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
 def number_to_human(num, length, binary = False):
     """Format a number to a SI decimal or binary string representation that
     should fit within length bytes"""
     if binary:
-        div = 1024
-        thresholds = THRESHOLD_BY_PRECISION_1024
+        divisor = 1024
+        powers = POWERS_1024
     else:
-        div = 1000
-        thresholds = THRESHOLD_BY_PRECISION_1000
+        divisor = 1000
+        powers = POWERS_1000
 
-    if num < div:
-        return str(round(num))
-
+    n = num
     index = 0
-    while num > div and index < SIZE_PREFIX_MAX:
-        num /= div
+    while n >= divisor and index <= SIZE_PREFIX_MAX:
+        n /= divisor
         index += 1
 
-    # Calculate the number of decimal places we're about to print, and check
-    # we shouldn't round up to the next prefix instead. e.g:
-    # 999950 (1MB-50) becomes 1.00M instead of 1000.0K
-    # 1073217536 (1GiB-512KiB) becomes 1.00G instead of 1024M
-    precision = min(2, max(0, length - (len(str(round(num))) + 2)))
-    if num >= thresholds[precision] and index != SIZE_PREFIX_MAX:
-        num /= div
-        index += 1
-        precision = min(2, max(0, length - (len(str(round(num))) + 2)))
+    u = SIZE_PREFIX[index]
 
-    return "{:.{width}f}{}".format(num, SIZE_PREFIX[index], width=precision)
+    if index == 0 or num % powers[index] == 0:
+        return str(int(n)) + u
+
+    for fmt in FORMATS_BY_PRECISION:
+        ret = fmt.format(n, u)
+        if len(ret) <= length:
+            return ret
+    return ret
 
 def format_dataset(path, limit, ellipsis = '+'):
     """Truncate a dataset name to a limit"""
