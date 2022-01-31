@@ -269,26 +269,37 @@ class ColumnGroupFormatter(ColumnFormatter):
 ################################################################################
 # General formatting
 
-# A more complete take on this is available here
-# https://stackoverflow.com/questions/12523586/python-format-size-application-converting-b-to-kb-mb-gb-tb/63839503#63839503
-SIZE_PREFIX = ['K', 'M', 'G', 'T', 'P', 'E']
+SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
 SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
-def bytes_to_human(num, binary=False):
-    div = 1024 if binary else 1000
-    step = div - 0.05
+POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
+POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
+FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
+def number_to_human(num, length, binary = False):
+    """Format a number to a SI decimal or binary string representation that
+    should fit within length bytes"""
+    if binary:
+        divisor = 1024
+        powers = POWERS_1024
+    else:
+        divisor = 1000
+        powers = POWERS_1000
 
-    if num < div:
-        return '{:.0f}'.format(num)
+    n = num
+    index = 0
+    while n >= divisor and index <= SIZE_PREFIX_MAX:
+        n /= divisor
+        index += 1
 
-    num /= div
+    u = SIZE_PREFIX[index]
 
-    for p in range(len(SIZE_PREFIX)):
-        if num < step:
-            break
-        if p < SIZE_PREFIX_MAX:
-            num /= div
+    if index == 0 or num % powers[index] == 0:
+        return str(int(n)) + u
 
-    return '{:.1f}{}'.format(num, SIZE_PREFIX[p])
+    for fmt in FORMATS_BY_PRECISION:
+        ret = fmt.format(n, u)
+        if len(ret) <= length:
+            return ret
+    return ret
 
 def format_dataset(path, limit, ellipsis = '+'):
     """Truncate a dataset name to a limit"""
@@ -409,10 +420,10 @@ else:
     column_separator = '  '
     name_just = str.ljust
     num_just = str.rjust
-    field_width = 11 if args.exact else 6
+    field_width = 11 if args.exact else 5
 
-format_iops = round if args.exact else lambda num: bytes_to_human(num, False)
-format_bytes = round if args.exact else lambda num: bytes_to_human(num, args.binaryprefix)
+format_iops = round if args.exact else lambda num: number_to_human(num, field_width)
+format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.binaryprefix)
 
 formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
 formatter.add_column('dataset', just=name_just)
