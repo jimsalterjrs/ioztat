@@ -7,7 +7,7 @@ This sample output shows activity which has taken place in the most recent secon
 
 ````
 root@redacted-prod0:~# ioztat -y -c1 ssd
-                   operations    bandwidth       opsize
+                   operations    throughput      opsize
 dataset            read  write   read  write   read  write
 ----------------  -----  -----  -----  -----  -----  -----
 ssd                   0      0      0      0      0      0
