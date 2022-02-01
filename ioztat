@@ -343,6 +343,11 @@ def print_format_dataset(name, last_path, limit, print=print):
 
     return (indent_dataset_path(cur_path[-1], len(cur_path) - 1, limit), cur_path)
 
+def indented_name_width(path):
+    """Calculate the maximum width of this path as rendered by print_format_dataset"""
+    segments = path.split('/')
+    return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
+
 ################################################################################
 
 SORTS = {
@@ -440,6 +445,8 @@ if args.count is None and args.interval is None:
 if args.fullname is None:
     args.fullname = args.sort != 'name' or args.scripted or args.exact or args.nonzero
 
+calc_name_width = len if args.fullname else indented_name_width
+
 pools = {dataset.split('/')[0] for dataset in args.dataset}
 if args.nonrecursive:
     # Make each match exact.
@@ -447,13 +454,6 @@ if args.nonrecursive:
 else:
     # Accept either an exact match or one with an additional component
     dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
-
-if args.fullname:
-    calc_name_width = len
-else:
-    def calc_name_width(path):
-        segments = path.split('/')
-        return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
 
 if args.scripted:
     column_separator = "\t"
