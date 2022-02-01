@@ -19,18 +19,25 @@
 .Op Fl T Ar u Ns | Ns d
 .Op Fl s Ar name Ns | Ns Ar operations Ns | Ns Ar reads Ns | Ns Ar writes Ns | Ns Ar throughput Ns | Ns Ar nread Ns | Ns Ar nwritten
 .Op Ar dataset ...
+.Op Ar interval Op Ar count
 .
 .Sh DESCRIPTION
 The
 .Nm
 utility displays logical I/O statistics for individual ZFS datasets.
-The first report is averaged over the system uptime, followed by reports averaged
-over the reporting
-.Ar interval ,
-one second by default.
-The initial summary may be suppressed with the
+The first report is averaged over the system uptime unless suppressed with
+.Fl y .
+If an
+.Ar interval
+is specified, this is followed by reports averaged over the reporting
+.Ar interval .
+If
 .Fl y
-option.
+or a
+.Ar count
+is specified,
+.Ar interval
+defaults to one second.
 .Pp
 Underlying device I/O depends on pool and dataset configuration.
 See
@@ -54,9 +61,14 @@ Display formatted byte sizes using decimal powers of 1000 instead of powers of 1
 Display
 .Ar count
 reports and exit.
-If no repeat
+This can also be specified after an
+.Ar interval
+at the end of the argument list.
+If
+.Ar interval
+is specified but not
 .Ar count
-is specified, the default is infinity.
+then it defaults to infinity, otherwise it defaults to one.
 .It Fl e
 Display exact values, without truncating dataset names (unless
 .Fl p
@@ -69,6 +81,8 @@ Display help text and exit.
 Pause
 .Ar interval
 seconds between reports.
+This can also be specified at the end of the argument list, optionally prior to a
+.Ar count .
 If no
 .Ar interval
 is specified the default is 1 second.
@@ -118,7 +132,7 @@ Omit datasets which have no activity.
 .Pp
 Display statistics for any mounted datasets within rpool/USERDATA which have activity.
 .Pp
-.Dl ioztat -zoTd -i5 -s operations
+.Dl ioztat -zoTd -s operations 5
 .Pp
 Display statistics for all mounted datasets with activity across five second intervals,
 ordered by total read and write operations, limited by available display and overwriting

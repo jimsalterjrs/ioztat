@@ -6,7 +6,7 @@ The statistics offered are read and write operations per second, read and write 
 This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host:
 
 ````
-root@redacted-prod0:~# ioztat -y -c1 ssd
+root@redacted-prod0:~# ioztat -y ssd
                    operations    throughput      opsize
 dataset            read  write   read  write   read  write
 ----------------  -----  -----  -----  -----  -----  -----
@@ -24,7 +24,6 @@ ssd                   0      0      0      0      0      0
   unsnapped           0      0      0      0      0      0
     rp9               0      0      0      0      0      0
 ----------------  -----  -----  -----  -----  -----  -----
-
 ````
 
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
@@ -32,12 +31,13 @@ For the most part, `ioztat` behaves the same way that the system standard `iosta
 ````
 usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
               [-s {name,operations,reads,writes,throughput,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
-              [dataset [dataset ...]]
+              [dataset [dataset ...]] [interval [count]]
 
 iostat for ZFS datasets
 
 positional arguments:
   dataset               ZFS dataset
+  interval [count]      seconds between reports and number of reports
 
 optional arguments:
   -c COUNT              number of reports generated
@@ -59,6 +59,8 @@ optional arguments:
   -z                    suppress datasets with zero activity
   ````
 
-Without arguments, `ioztat` first prints a summary record showing activity for each mounted dataset since the most recent system boot, then prints a new record showing the most recent activity once per second. The `-i` argument can be used to change the report interval, and the `-c` argument can be used to limit `ioztat` to a certain number of intervals before exiting.
+Without arguments, `ioztat` prints a summary record showing activity for each mounted dataset since the most recent system boot and exits.
 
-For a continually-updated, easy to read summary of pool activity, the `-o` argument will produce output similar to that of GNU watch.
+With an optional interval, `ioztat` will repeat reports until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second.  Both interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
+
+For a continually-updated, easy to read summary of pool activity, the `-o` argument with an interval will produce output similar to that of GNU watch.
