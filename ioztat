@@ -184,6 +184,20 @@ def delay_iter(it, interval):
         yield item
         time.sleep(interval)
 
+def skip_iter(it, count):
+    """Skip count iterations of the iterator before yielding"""
+    for _ in range(count):
+        next(it)
+
+    for x in it:
+        yield x
+
+def take_iter(it, count):
+    """Yield at most count items from iterator"""
+    while count > 0:
+        yield next(it)
+        count -= 1
+
 ################################################################################
 # Column formatting
 
@@ -470,13 +484,15 @@ formatter.add_column('write', width=field_width, format=format_bytes, just=num_j
 formatter.add_group('opsize', 2)
 
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
-diff_loop = delay_iter(diff_loop, args.interval)
 
-if args.skip or args.count is not None:
-    import itertools
-    if args.count:
-        args.count += args.skip
-    diff_loop = itertools.islice(diff_loop, args.skip, args.count)
+if args.interval:
+    diff_loop = delay_iter(diff_loop, args.interval)
+
+if args.skip:
+    diff_loop = skip_iter(diff_loop, args.skip)
+
+if args.count:
+    diff_loop = take_iter(diff_loop, args.count)
 
 if not args.overwrite:
     diff_loop = filter(None, diff_loop)
