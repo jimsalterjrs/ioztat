@@ -408,19 +408,20 @@ parser.add_argument('-z', dest='nonzero', action='store_true',
 
 args = parser.parse_args()
 
-# 123. and .123 but not nan, inf, 1e5, -42, etc
-POSITIVE_FLOAT_PATTERN = re.compile(r'\A(?:\d+\.?\d*|.\d+)\Z')
 def is_positive_float(value):
-    if isinstance(value, str):
-        return POSITIVE_FLOAT_PATTERN.match(value)
-    elif value:
-        return (not math.isnan(value)) and (not math.isinf(value)) and value > 0
+    try:
+        value = float(value)
+        # We want to avoid parsing 'inf' and 'nan', as these are valid pool names
+        # NaN always compares False with another float, so just guard against inf
+        return value > 0.0 and not math.isinf(value)
+    except ValueError:
+        return False
 
 if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
     args.interval = float(args.dataset.pop())
     if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
         args.count = int(round(args.interval))
-        args.interval = int(round(float(args.dataset.pop())))
+        args.interval = float(args.dataset.pop())
 
 if args.count is not None and not args.count > 0:
     parser.error('count must be positive')
