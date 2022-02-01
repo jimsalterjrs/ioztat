@@ -185,12 +185,10 @@ def delay_iter(it, interval):
         time.sleep(interval)
 
 def skip_iter(it, count):
-    """Skip count iterations of the iterator before yielding"""
+    """Skip count iterations of the iterator"""
     for _ in range(count):
         next(it)
-
-    for x in it:
-        yield x
+    return it
 
 def take_iter(it, count):
     """Yield at most count items from iterator"""
