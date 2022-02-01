@@ -375,7 +375,7 @@ for name, aliases in SORT_ALIAS.items():
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
 parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
-parser.add_argument('interval [count]', nargs='?',
+parser.add_argument(argparse.SUPPRESS, metavar='interval [count]', nargs='?',
                           help='seconds between reports and number of reports')
 parser.add_argument('-c', dest='count', type=int,
                           help='number of reports generated')
