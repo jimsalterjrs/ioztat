@@ -128,9 +128,9 @@ seconds.
 Omit datasets which have no activity.
 .El
 .Sh EXAMPLES
-.Dl ioztat -z rpool/USERDATA
+.Dl ioztat rpool/USERDATA 1
 .Pp
-Display statistics for any mounted datasets within rpool/USERDATA which have activity.
+Display per-second statistics for any mounted datasets within rpool/USERDATA.
 .Pp
 .Dl ioztat -zoTd -s operations 5
 .Pp
@@ -139,7 +139,7 @@ ordered by total read and write operations, limited by available display and ove
 prior reports in a manner similar to
 .Xr top 1 .
 .Pp
-.Dl ioztat -Heyc1
+.Dl ioztat -Hey
 .Pp
 Display a single one-second report for all mounted datasets, using a machine-readable
 format omitting headers, using tab-delimited fields, and providing exact values.
