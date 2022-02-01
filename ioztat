@@ -30,6 +30,7 @@
 PROGRAM_VERSION = '2.0.0-dev'
 
 import argparse
+import math
 import os
 import re
 import shutil
@@ -357,6 +358,8 @@ for name, aliases in SORT_ALIAS.items():
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
 parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
+parser.add_argument('interval [count]', nargs='?',
+                          help='seconds between reports and number of reports')
 parser.add_argument('-c', dest='count', type=int,
                           help='number of reports generated')
 parser.add_argument('-D', dest='decimal', action='store_true',
@@ -367,7 +370,7 @@ parser.add_argument('-H', dest='scripted', action='store_true',
                           help='scripted mode, skip headers and tab-separate')
 parser.add_argument('-h', '--help', action='help',
                           help='show this help message and exit')
-parser.add_argument('-i', dest='interval', type=float, default=1,
+parser.add_argument('-i', dest='interval', type=float,
                           help='interval between reports (in seconds)')
 parser.add_argument('-N', dest='headeronce', action='store_true',
                           help='display headers at most once')
@@ -392,6 +395,33 @@ parser.add_argument('-z', dest='nonzero', action='store_true',
                           help='suppress datasets with zero activity')
 
 args = parser.parse_args()
+
+# 123. and .123 but not nan, inf, 1e5, -42, etc
+POSITIVE_FLOAT_PATTERN = re.compile(r'\A(?:\d+\.?\d*|.\d+)\Z')
+def is_positive_float(value):
+    if isinstance(value, str):
+        return POSITIVE_FLOAT_PATTERN.match(value)
+    elif value:
+        return (not math.isnan(value)) and (not math.isinf(value)) and value > 0
+
+if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
+    args.interval = float(args.dataset.pop())
+    if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
+        args.count = int(round(args.interval))
+        args.interval = int(round(float(args.dataset.pop())))
+
+if args.count is not None and not args.count > 0:
+    parser.error('count must be positive')
+if args.interval is not None and not is_positive_float(args.interval):
+    parser.error('interval must be positive')
+
+# If there's no interval but a count, default to one second
+if args.interval is None and args.count:
+    args.interval = 1.0
+
+if args.count is None and args.interval is None:
+    args.count = 1
+    args.interval = 1.0
 
 # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
 if args.fullname is None:
