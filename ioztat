@@ -413,6 +413,7 @@ parser.add_argument('-z', dest='nonzero', action='store_true',
 
 args = parser.parse_args()
 
+# Handle [interval [count]]
 def is_positive_float(value):
     try:
         value = float(value)
@@ -428,16 +429,18 @@ if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
         args.count = int(round(args.interval))
         args.interval = float(args.dataset.pop())
 
+# Past here interval and count are either None or non-zero
 if args.count is not None and not args.count > 0:
     parser.error('count must be positive')
 if args.interval is not None and not is_positive_float(args.interval):
     parser.error('interval must be positive')
 
-# If there's no interval but a count, default to one second
-if args.interval is None and args.count:
+# If there's a count but no interval, default to one second
+if args.count and not args.interval:
     args.interval = 1.0
 
-if args.count is None and args.interval is None:
+# If neither are specified, default to one iteration and one second
+if not (args.count or args.interval):
     args.count = 1
     args.interval = 1.0
 
@@ -455,6 +458,7 @@ else:
     # Accept either an exact match or one with an additional component
     dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
+# Set up our column configuration
 if args.scripted:
     column_separator = "\t"
     name_just = None
@@ -482,6 +486,7 @@ formatter.add_column('read',  width=field_width, format=format_bytes, just=num_j
 formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
 formatter.add_group('opsize', 2)
 
+# Configure a chain of iterators appropriate for our arguments
 diff_loop = filter_diff_iter(pools, dataset_pattern, args.nonzero)
 
 if args.interval:
