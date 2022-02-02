@@ -38,6 +38,17 @@ import signal
 import sys
 import time
 
+################################################################################
+# We have little interesting to do with these signals - restore default handlers
+# so our WIFSIGNALED() state propagates properly to the shell
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+# Docs warn against this, but we're not writing to anything but stdout/err.
+# If we ever need to restore standard Python behaviour, catch BrokenPipeError in
+# our print() calls, restore the handler and then re-raise the signal.
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+################################################################################
+
 class Dataset:
     timestamp = 0
     name = ''
@@ -348,17 +359,6 @@ def indented_name_width(path):
     """Calculate the maximum width of this path as rendered by print_format_dataset"""
     segments = path.split('/')
     return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
-
-################################################################################
-
-# We have little interesting to do with these signals - restore default handlers
-# so our WIFSIGNALED() state propagates properly to the shell
-signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-# Docs warn against this, but we're not doing anything with sockets.
-# If we do need to restore default behaviour, catch BrokenPipeError in
-# our print() calls, restore the handler and then re-raise the signal.
-signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 ################################################################################
 
