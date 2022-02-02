@@ -148,6 +148,7 @@ class DatasetDiff:
         self.rareq_sz = self.nread / self.reads if self.reads else 0
         self.wareq_sz = self.nwritten / self.writes if self.writes else 0
 
+    def normalize_per_second(self):
         if self.timediff:
             self.reads /= self.timediff
             self.nread /= self.timediff
@@ -399,6 +400,8 @@ parser.add_argument('-H', dest='scripted', action='store_true',
                           help='scripted mode, skip headers and tab-separate')
 parser.add_argument('-h', '--help', action='help',
                           help='show this help message and exit')
+parser.add_argument('-I', dest='perinterval', action='store_true',
+                          help='show totals since the last update rather than averaged per-second')
 parser.add_argument('-i', dest='interval', type=float,
                           help='interval between reports (in seconds)')
 parser.add_argument('-N', dest='headeronce', action='store_true',
@@ -547,6 +550,9 @@ for iteration, diff in enumerate(diff_loop):
             name = d.name if args.exact else format_dataset(d.name, name_width)
         else:
             name, last_path = print_format_dataset(d.name, last_path, name_width, print=formatter.print)
+
+        if not args.perinterval:
+            d.normalize_per_second()
 
         formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
 

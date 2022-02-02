@@ -29,7 +29,7 @@ ssd                   0      0      0      0      0      0
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
+usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-I] [-i INTERVAL] [-N] [-n] [-o] [-P | -p]
               [-s {name,operations,reads,writes,throughput,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
               [dataset [dataset ...]] [interval [count]]
 
@@ -45,6 +45,7 @@ optional arguments:
   -e                    show exact values without truncation or scaling
   -H                    scripted mode, skip headers and tab-separate
   -h, --help            show this help message and exit
+  -I                    show totals since the last update rather than averaged per-second
   -i INTERVAL           interval between reports (in seconds)
   -N                    display headers at most once
   -n                    do not recurse into child datasets
@@ -59,8 +60,8 @@ optional arguments:
   -z                    suppress datasets with zero activity
   ````
 
-Without arguments, `ioztat` prints a summary record showing activity for each mounted dataset since the most recent system boot and exits.
+Without arguments, `ioztat` prints a summary of activity activity for each mounted dataset since the most recent system boot and exits.
 
-With an optional interval, `ioztat` will repeat reports until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second.  Both interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
+With an optional interval, `ioztat` will repeat reports on that schedule until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second.  Interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
 
-For a continually-updated, easy to read summary of pool activity, the `-o` argument with an interval will produce output similar to that of GNU watch.
+The `-o` flag will overwrite prior output and limit the display to the terminal height.  This can be combined with an interval and sorting options for an `iotop`-like experience.
