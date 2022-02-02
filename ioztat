@@ -395,19 +395,19 @@ parser.add_argument('-c', dest='count', type=int,
 parser.add_argument('-D', dest='decimal', action='store_true',
                           help='display bytes in decimal powers of 1000 instead of 1024')
 parser.add_argument('-e', dest='exact', action='store_true',
-                          help='show exact values without truncation or scaling')
+                          help='display exact values without truncation or scaling')
 parser.add_argument('-H', dest='scripted', action='store_true',
-                          help='scripted mode, skip headers and tab-separate')
+                          help='scripted mode, omit headers and tab-separate fields')
 parser.add_argument('-h', '--help', action='help',
-                          help='show this help message and exit')
+                          help='display this help message and exit')
 parser.add_argument('-I', dest='perinterval', action='store_true',
-                          help='show totals since the last update rather than averaged per-second')
+                          help='display totals since the last update rather than averaged per-second')
 parser.add_argument('-i', dest='interval', type=float,
                           help='interval between reports (in seconds)')
 parser.add_argument('-N', dest='headeronce', action='store_true',
                           help='display headers at most once')
 parser.add_argument('-n', dest='nonrecursive', action='store_true',
-                          help='do not recurse into child datasets')
+                          help='omit child datasets when filtering')
 parser.add_argument('-o', dest='overwrite', action='store_true',
                           help='overwrite old reports in terminal')
 group = parser.add_mutually_exclusive_group()
@@ -420,11 +420,12 @@ parser.add_argument('-s', dest='sort', type=str.lower, default='name',
                           help='sort by the specified field')
 parser.add_argument('-T', dest='timestamp', choices=['u', 'd'],
                           help='prefix each report with a Unix timestamp or formatted date')
-parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION)
+parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION,
+                          help='display version number and exit')
 parser.add_argument('-y', dest='skip', action='store_const', default=0, const=1,
-                          help='skip the initial "summary" report')
+                          help='omit the initial "summary" report')
 parser.add_argument('-z', dest='nonzero', action='store_true',
-                          help='suppress datasets with zero activity')
+                          help='omit datasets with zero activity')
 
 args = parser.parse_args()
 

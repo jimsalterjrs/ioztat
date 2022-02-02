@@ -42,22 +42,22 @@ positional arguments:
 optional arguments:
   -c COUNT              number of reports generated
   -D                    display bytes in decimal powers of 1000 instead of 1024
-  -e                    show exact values without truncation or scaling
-  -H                    scripted mode, skip headers and tab-separate
-  -h, --help            show this help message and exit
-  -I                    show totals since the last update rather than averaged per-second
+  -e                    display exact values without truncation or scaling
+  -H                    scripted mode, omit headers and tab-separate fields
+  -h, --help            display this help message and exit
+  -I                    display totals since the last update rather than averaged per-second
   -i INTERVAL           interval between reports (in seconds)
   -N                    display headers at most once
-  -n                    do not recurse into child datasets
+  -n                    omit child datasets when filtering
   -o                    overwrite old reports in terminal
   -P                    display dataset names on a single line
   -p                    display dataset names as an abbreviated tree
   -s {name,operations,reads,writes,throughput,nread,nwritten}
                         sort by the specified field
   -T {u,d}              prefix each report with a Unix timestamp or formatted date
-  -V, --version         show program's version number and exit
-  -y                    skip the initial "summary" report
-  -z                    suppress datasets with zero activity
+  -V, --version         display version number and exit
+  -y                    omit the initial "summary" report
+  -z                    omit datasets with zero activity
   ````
 
 Without arguments, `ioztat` prints a summary of activity activity for each mounted dataset since the most recent system boot and exits.
