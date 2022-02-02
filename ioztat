@@ -34,6 +34,7 @@ import math
 import os
 import re
 import shutil
+import signal
 import sys
 import time
 
@@ -350,6 +351,17 @@ def indented_name_width(path):
 
 ################################################################################
 
+# We have little interesting to do with these signals - restore default handlers
+# so our WIFSIGNALED() state propagates properly to the shell
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+# Docs warn against this, but we're not doing anything with sockets.
+# If we do need to restore default behaviour, catch BrokenPipeError in
+# our print() calls, restore the handler and then re-raise the signal.
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+################################################################################
+
 SORTS = {
     'name':       {'key': lambda x: x.name},
     'operations': {'key': lambda x: x.reads + x.writes,   'reverse': True},
@@ -501,48 +513,44 @@ if args.count:
 if not args.overwrite:
     diff_loop = filter(None, diff_loop)
 
-try:
-    max_name_width = 0
+max_name_width = 0
 
-    for iteration, diff in enumerate(diff_loop):
-        # Always sort by name first, so the main sort has it as a secondary
-        diff.sort(**SORTS['name'])
-        if args.sort != 'name':
-            diff.sort(**SORTS[args.sort])
+for iteration, diff in enumerate(diff_loop):
+    # Always sort by name first, so the main sort has it as a secondary
+    diff.sort(**SORTS['name'])
+    if args.sort != 'name':
+        diff.sort(**SORTS[args.sort])
 
-        width, height = shutil.get_terminal_size()
-        avail_width = width - formatter.get_printed_width(1, 7)
-        max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
-        name_width = max(10, min([avail_width, max_name_width]))
-        formatter.set_column_width(0, name_width)
+    width, height = shutil.get_terminal_size()
+    avail_width = width - formatter.get_printed_width(1, 7)
+    max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
+    name_width = max(10, min([avail_width, max_name_width]))
+    formatter.set_column_width(0, name_width)
 
-        if args.overwrite:
-            # Clear the screen and move the cursor to the upper-left
-            formatter.print("\033[2J\033[1;1H", end = '')
+    if args.overwrite:
+        # Clear the screen and move the cursor to the upper-left
+        formatter.print("\033[2J\033[1;1H", end = '')
 
-        if args.timestamp == 'u':
-            formatter.print(int(time.time()))
-        elif args.timestamp == 'd':
-            formatter.print(time.strftime('%c'))
+    if args.timestamp == 'u':
+        formatter.print(int(time.time()))
+    elif args.timestamp == 'd':
+        formatter.print(time.strftime('%c'))
 
-        if (not args.scripted) and (args.overwrite or iteration == 0 or
-            ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
-            formatter.print_header()
-            formatter.print_divider()
+    if (not args.scripted) and (args.overwrite or iteration == 0 or
+        ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
+        formatter.print_header()
+        formatter.print_divider()
 
-        last_path = []
-        for d in diff:
-            if args.fullname:
-                name = d.name if args.exact else format_dataset(d.name, name_width)
-            else:
-                name, last_path = print_format_dataset(d.name, last_path, name_width, print=formatter.print)
+    last_path = []
+    for d in diff:
+        if args.fullname:
+            name = d.name if args.exact else format_dataset(d.name, name_width)
+        else:
+            name, last_path = print_format_dataset(d.name, last_path, name_width, print=formatter.print)
 
-            formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
+        formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
 
-        if not (args.scripted or args.overwrite):
-            formatter.print_divider()
+    if not (args.scripted or args.overwrite):
+        formatter.print_divider()
 
-        formatter.flush(lines = height if args.overwrite else None)
-
-except KeyboardInterrupt:
-    print('')
+    formatter.flush(lines = height if args.overwrite else None)
