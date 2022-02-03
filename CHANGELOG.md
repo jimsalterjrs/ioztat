@@ -32,6 +32,7 @@
 - `count` and `interval` must now be positive [#31]
 - `BrokenPipeError` exception on `SIGPIPE`
 - `WIFSIGNALED()` status is now propagated properly to caller
+- Sleep interval now adjusts to compensate for runtime
 
 ## [1.1.0] - 2022-01-20
 
