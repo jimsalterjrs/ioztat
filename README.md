@@ -60,7 +60,7 @@ optional arguments:
   -z                    omit datasets with zero activity
   ````
 
-Without arguments, `ioztat` prints a summary of activity activity for each mounted dataset since the most recent system boot and exits.
+Without arguments, `ioztat` prints a summary of activity for each mounted dataset since the most recent system boot and exits.
 
 With an optional interval, `ioztat` will repeat reports on that schedule until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second.  Interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
 
