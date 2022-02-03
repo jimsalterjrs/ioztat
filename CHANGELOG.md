@@ -10,6 +10,7 @@
 - `-I` flag for totals since last update instead of per-second
 - `-o` flag to overwrite prior reports [#9] [#20]
 - `-P` and `-p` flags to override dataset name display [#19]
+- `-S` flag for including child dataset statistics in parents [#32]
 - `-T d|u` flag for adding a timestamp to each report [#25]
 - `-V`, `--version` flags [#13] [#14]
 - `interval` and `count` positional arguments [#31]
@@ -72,3 +73,4 @@ The first release of `ioztat` builds on efforts from the Reddit r/zfs community,
 [#25]: https://github.com/jimsalterjrs/ioztat/pull/25
 [#26]: https://github.com/jimsalterjrs/ioztat/pull/26
 [#31]: https://github.com/jimsalterjrs/ioztat/pull/31
+[#32]: https://github.com/jimsalterjrs/ioztat/pull/32
