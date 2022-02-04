@@ -69,7 +69,7 @@ class Dataset:
 ################################################################################
 # Platform specific section
 #
-# Must implement parse_datasets(pool?): dict(name: Dataset)
+# Must implement parse_datasets(Optional[pool]): dict[str, Dataset]
 ################################################################################
 if sys.platform.startswith("linux"):
     import glob
@@ -109,7 +109,8 @@ elif sys.platform.startswith("freebsd"):
         class sysctl:
             @staticmethod
             def filter(oid):
-                r = subprocess.run(["sysctl", "-e", oid], capture_output=True, check=True, encoding='latin-1')
+                r = subprocess.run(["sysctl", "-e", oid],
+                        capture_output=True, check=True, encoding='latin-1')
                 stats = [line.split("=", 2) for line in r.stdout.split("\n")]
                 return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
 
@@ -187,7 +188,10 @@ class DatasetDiff:
         return new
 
 def sumchildren(diffs):
-    """Return [DatasetDiff] for [DatasetDiff] having added child datasets to parents, creating them if necessary."""
+    """
+    Return Iterable[DatasetDiff] for Iterable[DatasetDiff] having added child
+    datasets to parents, creating them if necessary.
+    """
     sums = {}
     for diff in diffs:
         for depth in range(diff.name.count('/') + 1):
@@ -200,25 +204,28 @@ def sumchildren(diffs):
     return sums.values()
 
 def calc_diff(prevdatasets, datasets):
-    return (DatasetDiff(key).diff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys())
+    return (DatasetDiff(key).diff(prevdatasets[key], datasets[key])
+            for key in datasets.keys() & prevdatasets.keys())
 
 def calc_diff_from_start(datasets):
     zero = Dataset()
     return (DatasetDiff(name).diff(zero, dataset) for name, dataset in datasets.items())
 
 def dataset_iter(pools):
-    """Iterate over name: Dataset for pools"""
+    """Iterate over dict[str, Dataset] for pools"""
     if pools:
         while True:
-            yield {name: dataset for pool in pools for name, dataset in parse_datasets(pool).items()}
+            yield {name: dataset
+                    for pool in pools
+                    for name, dataset in parse_datasets(pool).items()}
     else:
         while True:
             yield parse_datasets()
 
 def diff_iter(pools):
-    """Iterate over [DatasetDiff] for pools"""
+    """Iterate over Iterable[DatasetDiff] for pools"""
     it = dataset_iter(pools)
-    prevdatasets = next(it)
+    prevdatasets = next(it, None)
     # yield the initial summary
     yield calc_diff_from_start(prevdatasets)
 
@@ -227,7 +234,7 @@ def diff_iter(pools):
         prevdatasets = datasets
 
 def interval_iter(it, interval):
-    """Yield an item from the provided iterator every interval seconds"""
+    """Yield an item from the provided Iterable every interval seconds"""
     deadline = time.monotonic() + interval
     for item in it:
         yield item
@@ -242,15 +249,15 @@ def interval_iter(it, interval):
         deadline += interval
 
 def skip_iter(it, count):
-    """Skip count iterations of the iterator"""
+    """Skip count iterations of the Iterable"""
     for _ in range(count):
-        next(it)
+        next(it, None)
     return it
 
 def take_iter(it, count):
-    """Yield at most count items from iterator"""
+    """Yield at most count items from Iterable"""
     while count > 0:
-        yield next(it)
+        yield next(it, None)
         count -= 1
 
 ################################################################################
@@ -298,9 +305,11 @@ class ColumnFormatter:
 
     def add_group(self, name='', colspan=1, just=str.center):
         if self.groups is None:
-            self.groups = ColumnGroupFormatter(column_separator=self.column_separator, buffer=self.buffer)
+            self.groups = ColumnGroupFormatter(column_separator=self.column_separator,
+                                               buffer=self.buffer)
 
-        self.groups.add_column(name, columns=self.columns[-colspan:], width=len(self.column_separator) * (colspan - 1), just=just)
+        self.groups.add_column(name, columns=self.columns[-colspan:],
+                               width=len(self.column_separator) * (colspan - 1), just=just)
 
     def set_column_width(self, column, width):
         self.columns[column].width = width
@@ -320,7 +329,9 @@ class ColumnFormatter:
         self.print(self.column_separator.join(formatted))
 
     def print_divider(self):
-        self.print(self.column_separator.join([''.ljust(c.width, self.row_separator) for c in self.columns]))
+        self.print(
+            self.column_separator.join(
+                [''.ljust(c.width, self.row_separator) for c in self.columns]))
 
     def print(self, string, end="\n"):
         self.buffer.append(string + end)
@@ -392,7 +403,10 @@ def indent_dataset_path(name, depth, limit):
     return (PATH_INDENT * depth) + name
 
 def print_format_dataset(name, last_path, limit, print=print):
-    """Take a path, print any elements not in last_path, and return a formatted name"""
+    """
+    Take a path, print any elements not in last_path, and return a formatted
+    name and a split path to be passed to the next call to this function
+    """
     cur_path = name.split('/')
     common = os.path.commonprefix([last_path, cur_path])
     for i, segment in enumerate(cur_path[len(common):-1]):
@@ -401,7 +415,9 @@ def print_format_dataset(name, last_path, limit, print=print):
     return (indent_dataset_path(cur_path[-1], len(cur_path) - 1, limit), cur_path)
 
 def indented_name_width(path):
-    """Calculate the maximum width of this path as rendered by print_format_dataset"""
+    """
+    Calculate the maximum width of this path as rendered by print_format_dataset
+    """
     segments = path.split('/')
     return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
 
@@ -515,10 +531,12 @@ dataset_pattern = None
 if pools:
     if args.nonrecursive:
         # Make each match exact.
-        dataset_pattern = re.compile("|".join((r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
+        dataset_pattern = re.compile("|".join(
+            (r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
     else:
         # Accept either an exact match or one with an additional component
-        dataset_pattern = re.compile("|".join((r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
+        dataset_pattern = re.compile("|".join(
+            (r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
 # Set up our column configuration
 if args.scripted:
@@ -558,7 +576,8 @@ if args.sumchildren:
     diff_loop = (sumchildren(diff) for diff in diff_loop)
 
 if dataset_pattern:
-    diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs) for diffs in diff_loop)
+    diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
+                 for diffs in diff_loop)
 
 if args.interval:
     diff_loop = interval_iter(diff_loop, args.interval)
@@ -605,12 +624,14 @@ for iteration, diff in enumerate(diff_loop):
         if args.fullname:
             name = d.name if args.exact else format_dataset(d.name, name_width)
         else:
-            name, last_path = print_format_dataset(d.name, last_path, name_width, print=formatter.print)
+            name, last_path = print_format_dataset(d.name, last_path, name_width,
+                                                   print=formatter.print)
 
         if not args.perinterval:
             d.normalize_per_second()
 
-        formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten, d.rareq_sz, d.wareq_sz)
+        formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten,
+                                d.rareq_sz, d.wareq_sz)
 
     if not (args.scripted or args.overwrite):
         formatter.print_divider()
