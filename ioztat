@@ -285,12 +285,12 @@ class ColumnGroup:
             return string
 
 class ColumnFormatter:
-    def __init__(self, column_separator = '  ', row_separator = '-', buffer = []):
+    def __init__(self, column_separator = '  ', row_separator = '-', buffer = None):
         self.columns = []
         self.groups = None
         self.column_separator = column_separator
         self.row_separator = row_separator
-        self.buffer = buffer
+        self.buffer = buffer if buffer is not None else []
 
     def add_column(self, name, **args):
         self.columns.append(Column(name, **args))
