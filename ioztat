@@ -27,8 +27,6 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-PROGRAM_VERSION = '2.0.0-dev'
-
 import argparse
 import math
 import os
@@ -37,6 +35,8 @@ import shutil
 import signal
 import sys
 import time
+
+PROGRAM_VERSION = '2.0.0-dev'
 
 ################################################################################
 # We have little interesting to do with these signals - restore default handlers
@@ -69,12 +69,12 @@ class Dataset:
 ################################################################################
 # Platform specific section
 #
-# Must implement parseDatasets(pool?): dict(name: Dataset)
+# Must implement parse_datasets(pool?): dict(name: Dataset)
 ################################################################################
 if sys.platform.startswith("linux"):
     import glob
 
-    def parseDatasets(pool = None):
+    def parse_datasets(pool = None):
         datasets = {}
         search = glob.escape(pool) if pool else '*'
         for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', search, 'objset-*')):
@@ -114,7 +114,7 @@ elif sys.platform.startswith("freebsd"):
 
     from collections import defaultdict
 
-    def parseDatasets(pool = None):
+    def parse_datasets(pool = None):
         # We're interested in kstat.zfs.*.dataset.objset-*.*
         # Note objset ID's are only unique to individual pools
         oid = "kstat.zfs."
@@ -198,10 +198,10 @@ def sumchildren(diffs):
 
     return sums.values()
 
-def calcDiff(prevdatasets, datasets):
+def calc_diff(prevdatasets, datasets):
     return (DatasetDiff(key).diff(prevdatasets[key], datasets[key]) for key in datasets.keys() & prevdatasets.keys())
 
-def calcDiffFromStart(datasets):
+def calc_diff_from_start(datasets):
     zero = Dataset()
     return (DatasetDiff(name).diff(zero, dataset) for name, dataset in datasets.items())
 
@@ -209,20 +209,20 @@ def dataset_iter(pools):
     """Iterate over name: Dataset for pools"""
     if pools:
         while True:
-            yield {name: dataset for pool in pools for name, dataset in parseDatasets(pool).items()}
+            yield {name: dataset for pool in pools for name, dataset in parse_datasets(pool).items()}
     else:
         while True:
-            yield parseDatasets()
+            yield parse_datasets()
 
 def diff_iter(pools):
     """Iterate over [DatasetDiff] for pools"""
     it = dataset_iter(pools)
     prevdatasets = next(it)
     # yield the initial summary
-    yield calcDiffFromStart(prevdatasets)
+    yield calc_diff_from_start(prevdatasets)
 
     for datasets in it:
-        yield calcDiff(prevdatasets, datasets)
+        yield calc_diff(prevdatasets, datasets)
         prevdatasets = datasets
 
 def interval_iter(it, interval):
@@ -516,10 +516,10 @@ dataset_pattern = None
 if pools:
     if args.nonrecursive:
         # Make each match exact.
-        dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "\Z" for ds in sorted(args.dataset))))
+        dataset_pattern = re.compile("|".join((r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
     else:
         # Accept either an exact match or one with an additional component
-        dataset_pattern = re.compile("|".join(("\A" + re.escape(ds) + "(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
+        dataset_pattern = re.compile("|".join((r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
 # Set up our column configuration
 if args.scripted:
