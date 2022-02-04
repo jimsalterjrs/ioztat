@@ -86,7 +86,7 @@ if sys.platform.startswith("linux"):
             #############################################
             # Field 7 of the header is a nanosecond data snapshot timestamp.
             # Conveniently, dataset names may not contain spaces.
-            with open(file, 'r') as f:
+            with open(file, 'r', encoding='latin-1') as f:
                 header, _fieldnames, *fields = [line.split() for line in f]
                 fields.append(("timestamp", None, header[6]))
                 ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
@@ -107,8 +107,9 @@ elif sys.platform.startswith("freebsd"):
                 self.value = value
 
         class sysctl:
+            @staticmethod
             def filter(oid):
-                r = subprocess.run(["sysctl", "-e", oid], capture_output=True, check=True, text=True)
+                r = subprocess.run(["sysctl", "-e", oid], capture_output=True, check=True, encoding='latin-1')
                 stats = [line.split("=", 2) for line in r.stdout.split("\n")]
                 return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
 
