@@ -425,9 +425,7 @@ SORT_ALIAS = {
     'nread': ['nreads', 'rmbps'],
     'nwritten': ['nwrite', 'nwrites', 'wmbps'],
 }
-for name, aliases in SORT_ALIAS.items():
-    for alias in aliases:
-        SORTS[alias] = SORTS[name]
+SORTS.update({alias: SORTS[name] for name, aliases in SORT_ALIAS.items() for alias in aliases})
 
 # Keep this ordered alphabetically
 parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
