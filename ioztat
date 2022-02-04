@@ -135,7 +135,7 @@ elif sys.platform.startswith("freebsd"):
 
 else:
     print("Unsupported platform: " + sys.platform)
-    exit(1)
+    sys.exit(1)
 
 ################################################################################
 
@@ -422,6 +422,7 @@ def indented_name_width(path):
     return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
 
 ################################################################################
+# Argument processing, column formatting, and main loop
 
 SORTS = {
     'name':       {'key': lambda x: x.name},
@@ -443,197 +444,212 @@ SORT_ALIAS = {
 }
 SORTS.update({alias: SORTS[name] for name, aliases in SORT_ALIAS.items() for alias in aliases})
 
-# Keep this ordered alphabetically
-parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
-parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
-parser.add_argument(argparse.SUPPRESS, metavar='interval [count]', nargs='?',
-                          help='seconds between reports and number of reports')
-parser.add_argument('-c', dest='count', type=int,
-                          help='number of reports generated')
-parser.add_argument('-D', dest='decimal', action='store_true',
-                          help='display bytes in decimal powers of 1000 instead of 1024')
-parser.add_argument('-e', dest='exact', action='store_true',
-                          help='display exact values without truncation or scaling')
-parser.add_argument('-H', dest='scripted', action='store_true',
-                          help='scripted mode, omit headers and tab-separate fields')
-parser.add_argument('-h', '--help', action='help',
-                          help='display this help message and exit')
-parser.add_argument('-I', dest='perinterval', action='store_true',
-                          help='display totals since the last update rather than averaged per-second')
-parser.add_argument('-i', dest='interval', type=float,
-                          help='interval between reports (in seconds)')
-parser.add_argument('-N', dest='headeronce', action='store_true',
-                          help='display headers at most once')
-parser.add_argument('-n', dest='nonrecursive', action='store_true',
-                          help='omit child datasets when filtering')
-parser.add_argument('-o', dest='overwrite', action='store_true',
-                          help='overwrite old reports in terminal')
-group = parser.add_mutually_exclusive_group()
-group.add_argument('-P', dest='fullname', action='store_true', default=None,
-                         help='display dataset names on a single line')
-group.add_argument('-p', dest='fullname', action='store_false', default=None,
-                         help='display dataset names as an abbreviated tree')
-parser.add_argument('-S', dest='sumchildren', action='store_true',
-                          help='include statistics for child datasets in parents')
-parser.add_argument('-s', dest='sort', type=str.lower, default='name',
-                          choices=SORTS.keys(), metavar='{%s}' % ','.join(SORT_DISPLAY),
-                          help='sort by the specified field')
-parser.add_argument('-T', dest='timestamp', choices=['u', 'd'],
-                          help='prefix each report with a Unix timestamp or formatted date')
-parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION,
-                          help='display version number and exit')
-parser.add_argument('-y', dest='skip', action='store_const', default=0, const=1,
-                          help='omit the initial "summary" report')
-parser.add_argument('-z', dest='nonzero', action='store_true',
-                          help='omit datasets with zero activity')
+def parse_args():
+    """Parse command-line arguments list"""
+    parser = argparse.ArgumentParser(description='iostat for ZFS datasets', add_help=False)
+    parser.add_argument('dataset', type=str, nargs='*', help='ZFS dataset')
+    parser.add_argument(argparse.SUPPRESS, metavar='interval [count]', nargs='?',
+                        help='seconds between reports and number of reports')
+    parser.add_argument('-c', dest='count', type=int,
+                        help='number of reports generated')
+    parser.add_argument('-D', dest='decimal', action='store_true',
+                        help='display bytes in decimal powers of 1000 instead of 1024')
+    parser.add_argument('-e', dest='exact', action='store_true',
+                        help='display exact values without truncation or scaling')
+    parser.add_argument('-H', dest='scripted', action='store_true',
+                        help='scripted mode, omit headers and tab-separate fields')
+    parser.add_argument('-h', '--help', action='help',
+                        help='display this help message and exit')
+    parser.add_argument('-I', dest='perinterval', action='store_true',
+                        help='display totals since the last update rather than averaged per-second')
+    parser.add_argument('-i', dest='interval', type=float,
+                        help='interval between reports (in seconds)')
+    parser.add_argument('-N', dest='headeronce', action='store_true',
+                        help='display headers at most once')
+    parser.add_argument('-n', dest='nonrecursive', action='store_true',
+                        help='omit child datasets when filtering')
+    parser.add_argument('-o', dest='overwrite', action='store_true',
+                        help='overwrite old reports in terminal')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-P', dest='fullname', action='store_true', default=None,
+                       help='display dataset names on a single line')
+    group.add_argument('-p', dest='fullname', action='store_false', default=None,
+                       help='display dataset names as an abbreviated tree')
+    parser.add_argument('-S', dest='sumchildren', action='store_true',
+                        help='include statistics for child datasets in parents')
+    parser.add_argument('-s', dest='sort', type=str.lower, default='name',
+                        choices=SORTS.keys(), metavar='{%s}' % ','.join(SORT_DISPLAY),
+                        help='sort by the specified field')
+    parser.add_argument('-T', dest='timestamp', choices=['u', 'd'],
+                        help='prefix each report with a Unix timestamp or formatted date')
+    parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION,
+                        help='display version number and exit')
+    parser.add_argument('-y', dest='skip', action='store_const', default=0, const=1,
+                        help='omit the initial "summary" report')
+    parser.add_argument('-z', dest='nonzero', action='store_true',
+                        help='omit datasets with zero activity')
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-# Handle [interval [count]]
-def is_positive_float(value):
-    try:
-        value = float(value)
-        # We want to avoid parsing 'inf' and 'nan', as these are valid pool names
-        # NaN always compares False with another float, so just guard against inf
-        return value > 0.0 and not math.isinf(value)
-    except ValueError:
-        return False
+    # Handle [interval [count]]
+    def is_positive_float(value):
+        try:
+            value = float(value)
+            # We want to avoid parsing 'inf' and 'nan', as these are valid pool names
+            # NaN always compares False with another float, so just guard against inf
+            return value > 0.0 and not math.isinf(value)
+        except ValueError:
+            return False
 
-if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
-    args.interval = float(args.dataset.pop())
     if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
-        args.count = int(round(args.interval))
         args.interval = float(args.dataset.pop())
+        if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
+            args.count = int(round(args.interval))
+            args.interval = float(args.dataset.pop())
 
-# Past here interval and count are either None or non-zero
-if args.count is not None and not args.count > 0:
-    parser.error('count must be positive')
-if args.interval is not None and not is_positive_float(args.interval):
-    parser.error('interval must be positive')
+    # Past here interval and count are either None or non-zero
+    if args.count is not None and not args.count > 0:
+        parser.error('count must be positive')
+    if args.interval is not None and not is_positive_float(args.interval):
+        parser.error('interval must be positive')
 
-# If there's a count but no interval, default to one second
-if args.count and not args.interval:
-    args.interval = 1.0
+    # If there's a count but no interval, default to one second
+    if args.count and not args.interval:
+        args.interval = 1.0
 
-# If neither are specified, default to one iteration and one second
-if not (args.count or args.interval):
-    args.count = 1
-    args.interval = 1.0
+    # If neither are specified, default to one iteration and one second
+    if not (args.count or args.interval):
+        args.count = 1
+        args.interval = 1.0
 
-# Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
-if args.fullname is None:
-    args.fullname = args.sort != 'name' or args.scripted or args.exact or args.nonzero
+    # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
+    if args.fullname is None:
+        args.fullname = args.sort != 'name' or args.scripted or args.exact or args.nonzero
 
-calc_name_width = len if args.fullname else indented_name_width
+    return args
 
-pools = {dataset.split('/')[0] for dataset in args.dataset}
-dataset_pattern = None
-if pools:
-    if args.nonrecursive:
-        # Make each match exact.
-        dataset_pattern = re.compile("|".join(
-            (r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
+def create_column_formatter(args):
+    """Create a ColumnFormatter instance configured for the given args"""
+    if args.scripted:
+        column_separator = "\t"
+        name_just = None
+        num_just = None
+        field_width = 0
     else:
-        # Accept either an exact match or one with an additional component
-        dataset_pattern = re.compile("|".join(
-            (r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
+        column_separator = '  '
+        name_just = str.ljust
+        num_just = str.rjust
+        field_width = 11 if args.exact else 5
 
-# Set up our column configuration
-if args.scripted:
-    column_separator = "\t"
-    name_just = None
-    num_just = None
-    field_width = 0
-else:
-    column_separator = '  '
-    name_just = str.ljust
-    num_just = str.rjust
-    field_width = 11 if args.exact else 5
+    format_iops = round if args.exact else lambda num: number_to_human(num, field_width, True)
+    format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.decimal)
 
-format_iops = round if args.exact else lambda num: number_to_human(num, field_width, True)
-format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.decimal)
+    formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
+    formatter.add_column('dataset', just=name_just)
+    formatter.add_group()
+    formatter.add_column('read',  width=field_width, format=format_iops, just=num_just)
+    formatter.add_column('write', width=field_width, format=format_iops, just=num_just)
+    formatter.add_group('operations', 2)
+    formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
+    formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
+    formatter.add_group('throughput', 2)
+    formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
+    formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
+    formatter.add_group('opsize', 2)
+    return formatter
 
-formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
-formatter.add_column('dataset', just=name_just)
-formatter.add_group()
-formatter.add_column('read',  width=field_width, format=format_iops, just=num_just)
-formatter.add_column('write', width=field_width, format=format_iops, just=num_just)
-formatter.add_group('operations', 2)
-formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
-formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
-formatter.add_group('throughput', 2)
-formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
-formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
-formatter.add_group('opsize', 2)
-
-# Configure a chain of iterators appropriate for our arguments
-diff_loop = diff_iter(pools)
-
-if args.nonzero:
-    diff_loop = (filter(lambda diff: diff.is_nonzero(), diffs) for diffs in diff_loop)
-
-if args.sumchildren:
-    diff_loop = (sumchildren(diff) for diff in diff_loop)
-
-if dataset_pattern:
-    diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
-                 for diffs in diff_loop)
-
-if args.interval:
-    diff_loop = interval_iter(diff_loop, args.interval)
-
-if args.skip:
-    diff_loop = skip_iter(diff_loop, args.skip)
-
-if args.count:
-    diff_loop = take_iter(diff_loop, args.count)
-
-if not args.overwrite:
-    diff_loop = filter(None, diff_loop)
-
-max_name_width = 0
-
-for iteration, diff in enumerate(diff_loop):
-    # Always sort by name first, so the main sort has it as a secondary
-    diff = sorted(diff, **SORTS['name'])
-    if args.sort != 'name':
-        diff.sort(**SORTS[args.sort])
-
-    width, height = shutil.get_terminal_size()
-    avail_width = width - formatter.get_printed_width(1, 7)
-    max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
-    name_width = max(10, min([avail_width, max_name_width]))
-    formatter.set_column_width(0, name_width)
-
-    if args.overwrite:
-        # Clear the screen and move the cursor to the upper-left
-        formatter.print("\033[2J\033[1;1H", end = '')
-
-    if args.timestamp == 'u':
-        formatter.print(int(time.time()))
-    elif args.timestamp == 'd':
-        formatter.print(time.strftime('%c'))
-
-    if (not args.scripted) and (args.overwrite or iteration == 0 or
-        ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
-        formatter.print_header()
-        formatter.print_divider()
-
-    last_path = []
-    for d in diff:
-        if args.fullname:
-            name = d.name if args.exact else format_dataset(d.name, name_width)
+def create_diff_iter(args):
+    """Create an iterator over Iterable[DatasetDiff] for the given args"""
+    pools = {dataset.split('/')[0] for dataset in args.dataset}
+    dataset_pattern = None
+    if pools:
+        if args.nonrecursive:
+            # Make each match exact.
+            dataset_pattern = re.compile("|".join(
+                (r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
         else:
-            name, last_path = print_format_dataset(d.name, last_path, name_width,
-                                                   print=formatter.print)
+            # Accept either an exact match or one with an additional component
+            dataset_pattern = re.compile("|".join(
+                (r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
-        if not args.perinterval:
-            d.normalize_per_second()
+    # Configure a chain of iterators appropriate for our arguments
+    diff_loop = diff_iter(pools)
 
-        formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten,
-                                d.rareq_sz, d.wareq_sz)
+    if args.nonzero:
+        diff_loop = (filter(lambda diff: diff.is_nonzero(), diffs) for diffs in diff_loop)
 
-    if not (args.scripted or args.overwrite):
-        formatter.print_divider()
+    if args.sumchildren:
+        diff_loop = (sumchildren(diff) for diff in diff_loop)
 
-    formatter.flush(lines = height if args.overwrite else None)
+    if dataset_pattern:
+        diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
+                    for diffs in diff_loop)
+
+    if args.interval:
+        diff_loop = interval_iter(diff_loop, args.interval)
+
+    if args.skip:
+        diff_loop = skip_iter(diff_loop, args.skip)
+
+    if args.count:
+        diff_loop = take_iter(diff_loop, args.count)
+
+    if not args.overwrite:
+        diff_loop = filter(None, diff_loop)
+
+    return diff_loop
+
+def main():
+    args = parse_args()
+    formatter = create_column_formatter(args)
+
+    calc_name_width = len if args.fullname else indented_name_width
+    max_name_width = 0
+
+    for iteration, diff in enumerate(create_diff_iter(args)):
+        # Always sort by name first, so the main sort has it as a secondary
+        diff = sorted(diff, **SORTS['name'])
+        if args.sort != 'name':
+            diff.sort(**SORTS[args.sort])
+
+        width, height = shutil.get_terminal_size()
+        avail_width = width - formatter.get_printed_width(1, 7)
+        max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
+        name_width = max(10, min([avail_width, max_name_width]))
+        formatter.set_column_width(0, name_width)
+
+        if args.overwrite:
+            # Clear the screen and move the cursor to the upper-left
+            formatter.print("\033[2J\033[1;1H", end = '')
+
+        if args.timestamp == 'u':
+            formatter.print(int(time.time()))
+        elif args.timestamp == 'd':
+            formatter.print(time.strftime('%c'))
+
+        if (not args.scripted) and (args.overwrite or iteration == 0 or
+          ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
+            formatter.print_header()
+            formatter.print_divider()
+
+        last_path = []
+        for d in diff:
+            if args.fullname:
+                name = d.name if args.exact else format_dataset(d.name, name_width)
+            else:
+                name, last_path = print_format_dataset(d.name, last_path, name_width,
+                                                       print=formatter.print)
+
+            if not args.perinterval:
+                d.normalize_per_second()
+
+            formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten,
+                                    d.rareq_sz, d.wareq_sz)
+
+        if not (args.scripted or args.overwrite):
+            formatter.print_divider()
+
+        formatter.flush(lines = height if args.overwrite else None)
+
+if __name__ == '__main__':
+    main()
