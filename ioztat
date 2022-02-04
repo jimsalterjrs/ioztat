@@ -297,7 +297,7 @@ class ColumnFormatter:
 
     def add_group(self, name='', colspan=1, just=str.center):
         if self.groups is None:
-            self.groups = ColumnGroupFormatter(column_separator=column_separator, buffer=self.buffer)
+            self.groups = ColumnGroupFormatter(column_separator=self.column_separator, buffer=self.buffer)
 
         self.groups.add_column(name, columns=self.columns[-colspan:], width=len(self.column_separator) * (colspan - 1), just=just)
 
