@@ -274,9 +274,8 @@ def skip_iter(it, count):
 
 def take_iter(it, count):
     """Yield at most count items from Iterable"""
-    while count > 0:
+    for _ in range(count):
         yield next(it, None)
-        count -= 1
 
 
 ################################################################################
