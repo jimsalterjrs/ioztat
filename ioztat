@@ -659,7 +659,9 @@ def create_diff_iter(args):
         diff_loop = take_iter(diff_loop, args.count)
 
     if not args.overwrite:
-        diff_loop = filter(None, diff_loop)
+        # Filter out empty iterations if we're in normal mode.
+        # Since this might yield generators we must cast to list first.
+        diff_loop = filter(None, map(list, diff_loop))
 
     return diff_loop
 
