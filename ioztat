@@ -30,7 +30,6 @@
 import argparse
 import math
 import os
-import re
 import shutil
 import signal
 import sys
@@ -545,6 +544,14 @@ def parse_args():
 
     args = parser.parse_args()
 
+    # Sanitize dataset list
+    trailing_slash = [ds for ds in args.dataset if ds.endswith('/')]
+    if trailing_slash:
+        parser.error(f"trailing slash in datasets: {', '.join(trailing_slash)}")
+
+    if [ds for ds in args.dataset if len(ds) == 0]:
+        parser.error("empty dataset name specified")
+
     # Handle [interval [count]]
     def is_positive_float(value):
         try:
@@ -621,16 +628,6 @@ def create_column_formatter(args):
 def create_diff_iter(args):
     """Create an iterator over Iterable[DatasetDiff] for the given args"""
     pools = {dataset.split('/')[0] for dataset in args.dataset}
-    dataset_pattern = None
-    if pools:
-        if args.nonrecursive:
-            # Make each match exact.
-            dataset_pattern = re.compile("|".join(
-                (r"\A" + re.escape(ds) + r"\Z" for ds in sorted(args.dataset))))
-        else:
-            # Accept either an exact match or one with an additional component
-            dataset_pattern = re.compile("|".join(
-                (r"\A" + re.escape(ds) + r"(?:\Z|/[^/]+)" for ds in sorted(args.dataset))))
 
     # Configure a chain of iterators appropriate for our arguments
     diff_loop = diff_iter(pools)
@@ -641,9 +638,19 @@ def create_diff_iter(args):
     if args.sumchildren:
         diff_loop = (sum_children(diff) for diff in diff_loop)
 
-    if dataset_pattern:
-        diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
-                     for diffs in diff_loop)
+    if args.dataset:
+        # Cast to a faster structure for lookups
+        # In my testing a set is faster even for a single item.
+        args.dataset = set(args.dataset)
+        if args.nonrecursive:
+            # Look only for the exact datasets specified
+            diff_loop = ((d for d in diffs if d.name in args.dataset)
+                        for diffs in diff_loop)
+        else:
+            # Also look for any that start with those plus a slash
+            starts = tuple((ds + '/' for ds in args.dataset))
+            diff_loop = ((d for d in diffs if d.name in args.dataset or d.name.startswith(starts))
+                        for diffs in diff_loop)
 
     if args.interval:
         diff_loop = interval_iter(diff_loop, args.interval)
