@@ -595,6 +595,9 @@ def parse_args():
     if args.fullname is None:
         args.fullname = args.sort != 'name' or args.scripted or args.exact or args.nonzero
 
+    if args.overwrite and not sys.stdout.isatty():
+        parser.error('overwrite mode only supported in a terminal')
+
     return args
 
 
@@ -683,6 +686,7 @@ def main():
 
     calc_name_width = len if args.fullname else DatasetName.indent_len
     max_name_width = 0
+    isatty = sys.stdout.isatty()
 
     for iteration, diff in enumerate(create_diff_iter(args)):
         # Always sort by name first, so the main sort has it as a secondary
@@ -706,10 +710,11 @@ def main():
         elif args.timestamp == 'd':
             formatter.print(time.strftime('%c'))
 
-        if (not args.scripted) and (args.overwrite or iteration == 0 or
-           ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
-            formatter.print_header()
-            formatter.print_divider()
+        if not args.scripted:
+            if (iteration == 0 or not args.headeronce and
+                (args.overwrite or isatty and iteration % height == 0)):
+                formatter.print_header()
+                formatter.print_divider()
 
         last_path = []
         for d in diff:
