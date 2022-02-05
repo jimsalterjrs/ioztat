@@ -51,21 +51,24 @@ signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
 class Dataset:
-    timestamp = 0
+    """
+    ZFS dataset statistics with a nanosecond monotonic timestamp.
+    """
     name = ''
-    writes = 0
-    nwritten = 0
     reads = 0
     nread = 0
+    writes = 0
+    nwritten = 0
+    timestamp = 0
 
     def __init__(self, data=None):
         if data:
-            self.timestamp = int(data['timestamp'])
             self.name = data['dataset_name']
             self.reads = int(data['reads'])
             self.nread = int(data['nread'])
             self.writes = int(data['writes'])
             self.nwritten = int(data['nwritten'])
+            self.timestamp = int(data['timestamp'])
 
 
 ################################################################################
@@ -182,8 +185,7 @@ class DatasetDiff:
         return self.reads or self.writes or self.nread or self.nwritten
 
     def __add__(self, other):
-        new = DatasetDiff()
-        new.name = self.name
+        new = DatasetDiff(self.name)
         new.timediff = max(self.timediff, other.timediff)
         new.reads = self.reads + other.reads
         new.nread = self.nread + other.nread
@@ -192,7 +194,7 @@ class DatasetDiff:
         return new
 
 
-def sumchildren(diffs):
+def sum_children(diffs):
     """
     Return Iterable[DatasetDiff] for Iterable[DatasetDiff] having added child
     datasets to parents, creating them if necessary.
@@ -274,6 +276,7 @@ def take_iter(it, count):
 
 
 ################################################################################
+# String formatting
 
 class Column:
     """
@@ -334,7 +337,7 @@ class ColumnFormatter:
     def add_group(self, name='', colspan=1, just=str.center):
         if self.groups is None:
             self.groups = ColumnFormatter(column_separator=self.column_separator,
-                                               buffer=self.buffer)
+                                          buffer=self.buffer)
 
         self.groups.add_column(name, cls=ColumnGroup, columns=self.columns[-colspan:],
                                width=len(self.column_separator) * (colspan - 1), just=just)
@@ -381,9 +384,6 @@ class ColumnFormatter:
         self.buffer.clear()
 
 
-################################################################################
-# General formatting
-
 class NumberToHuman:
     """Number formatting functions"""
 
@@ -420,6 +420,7 @@ class NumberToHuman:
                     return ret
             return ret
         return fmt
+
 
 class DatasetName:
     """Dataset name formatting functions"""
@@ -474,7 +475,7 @@ class DatasetName:
 
 
 ################################################################################
-# Argument processing, column formatting, and main loop
+# Argument processing, column configuration, and main loop
 
 SORTS = {
     'name':       {'key': lambda x: x.name},
@@ -495,6 +496,7 @@ SORT_ALIAS = {
     'nwritten': ['nwrite', 'nwrites', 'wmbps'],
 }
 SORTS.update({alias: SORTS[name] for name, aliases in SORT_ALIAS.items() for alias in aliases})
+
 
 def parse_args():
     """Parse command-line arguments list"""
@@ -637,7 +639,7 @@ def create_diff_iter(args):
         diff_loop = (filter(lambda diff: diff.is_nonzero(), diffs) for diffs in diff_loop)
 
     if args.sumchildren:
-        diff_loop = (sumchildren(diff) for diff in diff_loop)
+        diff_loop = (sum_children(diff) for diff in diff_loop)
 
     if dataset_pattern:
         diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
