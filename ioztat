@@ -119,8 +119,8 @@ elif sys.platform.startswith("freebsd"):
             @staticmethod
             def filter(oid):
                 r = subprocess.run(["sysctl", "-e", oid],
-                                   capture_output=True, check=True, encoding='latin-1')
-                stats = [line.split("=", 2) for line in r.stdout.split("\n")]
+                                   capture_output=True, check=False, encoding='latin-1')
+                stats = (line.split("=", 2) for line in r.stdout.split("\n"))
                 return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
 
     from collections import defaultdict
