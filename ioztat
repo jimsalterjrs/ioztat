@@ -91,11 +91,15 @@ if sys.platform.startswith("linux"):
             #############################################
             # Field 7 of the header is a nanosecond data snapshot timestamp.
             # Conveniently, dataset names may not contain spaces.
-            with open(file, 'r', encoding='latin-1') as f:
-                header, _fieldnames, *fields = [line.split() for line in f]
-                fields.append(("timestamp", None, header[6]))
-                ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
-                datasets[ds.name] = ds
+            try:
+                with open(file, 'r', encoding='latin-1') as f:
+                    header, _fieldnames, *fields = [line.split() for line in f]
+                    fields.append(("timestamp", None, header[6]))
+                    ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
+                    datasets[ds.name] = ds
+            except FileNotFoundError:
+                # Datasets may be destroyed between our globbing and opening
+                pass
         return datasets
 
 elif sys.platform.startswith("freebsd"):

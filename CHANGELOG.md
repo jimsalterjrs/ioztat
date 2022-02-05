@@ -30,9 +30,10 @@
 ### Fixed
 
 - `count` and `interval` must now be positive [#31]
-- `BrokenPipeError` exception on `SIGPIPE`
 - `WIFSIGNALED()` status is now propagated properly to caller
 - Sleep interval now adjusts to compensate for runtime
+- Unhandled `BrokenPipeError` exception on `SIGPIPE`
+- Unhandled `FileNotFoundError` exception on Linux if a dataset is destroyed while enumerating files in `/proc`
 
 ## [1.1.0] - 2022-01-20
 
