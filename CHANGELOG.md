@@ -34,6 +34,7 @@
 - Sleep interval now adjusts to compensate for runtime
 - Unhandled `BrokenPipeError` exception on `SIGPIPE`
 - Unhandled `FileNotFoundError` exception on Linux if a dataset is destroyed while enumerating files in `/proc`
+- Unhandled `CalledProcessError` exception on FreeBSD if a requested pool does not exist when using `sysctl(8)` fallback
 
 ## [1.1.0] - 2022-01-20
 
