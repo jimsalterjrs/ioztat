@@ -274,9 +274,12 @@ def take_iter(it, count):
 
 
 ################################################################################
-# Column formatting
 
 class Column:
+    """
+    Formats (translates raw value to string) and optionally justifies (adjusts
+    the string to fit within a given width) a single column.
+    """
     def __init__(self, name, width=0, format=str, just=None):
         self.name = name
         self.width = width
@@ -294,6 +297,13 @@ class Column:
 
 
 class ColumnGroup:
+    """
+    A simplified column that justifies a string to span the set of Column
+    objects it is meant to cover.  Does not support formatting.
+
+    Width here is the size of separators not covered by the raw width of the
+    spanned columns themselves.
+    """
     def __init__(self, name, columns, width=0, just=str.center):
         self.name = name
         self.columns = columns
@@ -302,12 +312,15 @@ class ColumnGroup:
 
     def justify(self, string):
         if self.just:
-            return self.just(string, self.width + sum([c.width for c in self.columns]))
+            return self.just(string, self.width + sum((c.width for c in self.columns)))
         else:
             return string
 
 
 class ColumnFormatter:
+    """
+    A buffered formatter for columnar data with optional group headings.
+    """
     def __init__(self, column_separator='  ', row_separator='-', buffer=None):
         self.columns = []
         self.groups = None
@@ -315,21 +328,22 @@ class ColumnFormatter:
         self.row_separator = row_separator
         self.buffer = buffer if buffer is not None else []
 
-    def add_column(self, name, **args):
-        self.columns.append(Column(name, **args))
+    def add_column(self, name, cls=Column, **args):
+        self.columns.append(cls(name, **args))
 
     def add_group(self, name='', colspan=1, just=str.center):
         if self.groups is None:
-            self.groups = ColumnGroupFormatter(column_separator=self.column_separator,
+            self.groups = ColumnFormatter(column_separator=self.column_separator,
                                                buffer=self.buffer)
 
-        self.groups.add_column(name, columns=self.columns[-colspan:],
+        self.groups.add_column(name, cls=ColumnGroup, columns=self.columns[-colspan:],
                                width=len(self.column_separator) * (colspan - 1), just=just)
 
     def set_column_width(self, column, width):
         self.columns[column].width = width
 
     def get_printed_width(self, start, stop=None):
+        """Return the width of columns[start:stop]"""
         return sum((c.width + len(self.column_separator) for c in self.columns[start:stop]))
 
     def print_columns(self, *columns):
@@ -349,9 +363,17 @@ class ColumnFormatter:
                 [''.ljust(c.width, self.row_separator) for c in self.columns]))
 
     def print(self, string, end="\n"):
+        """
+        Adds the specified string to the internal buffer.
+
+        Must eventually be followed by a call to flush()
+        """
         self.buffer.append(string + end)
 
     def flush(self, lines=None):
+        """
+        Print the internal buffer, up to the optional lines limit.
+        """
         buffer = ''.join(self.buffer)
         if lines:
             buffer = "\n".join(buffer.split("\n", lines)[:lines])
@@ -359,89 +381,96 @@ class ColumnFormatter:
         self.buffer.clear()
 
 
-class ColumnGroupFormatter(ColumnFormatter):
-    def add_column(self, name, **args):
-        self.columns.append(ColumnGroup(name, **args))
-
-
 ################################################################################
 # General formatting
 
-SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
-SIZE_PREFIX_MAX = len(SIZE_PREFIX) - 1
-POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
-POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
-FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
+class NumberToHuman:
+    """Number formatting functions"""
 
-def number_to_human(num, length, decimal=False):
-    """Format a number to a SI decimal or binary string representation that
-    should fit within length bytes"""
-    if decimal:
-        divisor = 1000
-        powers = POWERS_1000
-    else:
-        divisor = 1024
-        powers = POWERS_1024
+    SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
+    FORMATS = ('{:.2f}{}', '{:.1f}{}', '{:.0f}{}')
 
-    n = num
-    index = 0
-    while n >= divisor and index <= SIZE_PREFIX_MAX:
-        n /= divisor
-        index += 1
+    @classmethod
+    def formatter(cls, length, decimal=False):
+        """
+        Return a function that will format a number to a shortened SI decimal or
+        binary form that fits within a given length.
+        """
+        divisor = 1000 if decimal else 1024
+        formats = cls.FORMATS
+        size_prefix = cls.SIZE_PREFIX
+        size_prefix_max = len(size_prefix) - 1
+        powers = [pow(divisor, i) for i in range(len(size_prefix))]
 
-    u = SIZE_PREFIX[index]
+        def fmt(num):
+            n = num
+            index = 0
+            while n >= divisor and index <= size_prefix_max:
+                n /= divisor
+                index += 1
 
-    if index == 0 or num % powers[index] == 0:
-        return str(int(n)) + u
+            u = size_prefix[index]
 
-    for fmt in FORMATS_BY_PRECISION:
-        ret = fmt.format(n, u)
-        if len(ret) <= length:
+            if index == 0 or num % powers[index] == 0:
+                return str(int(n)) + u
+
+            for fmt in formats:
+                ret = fmt.format(n, u)
+                if len(ret) <= length:
+                    return ret
             return ret
-    return ret
+        return fmt
 
+class DatasetName:
+    """Dataset name formatting functions"""
 
-def format_dataset(path, limit, ellipsis='+'):
-    """Truncate a dataset name to a limit"""
-    if len(path) <= limit:
-        return path
+    PATH_INDENT = '  '
+    ELLIPSIS = '+'
 
-    # Always display the pool name
-    components = path.split('/', 1)
-    ret = components[0]
-    if len(components) > 1:
-        ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
-    return ret
+    @classmethod
+    def shorten(cls, path, limit):
+        """Shorten a dataset name to fit within limit"""
+        if len(path) <= limit:
+            return path
 
+        # Always display the pool name
+        components = path.split('/', 1)
+        ret = components[0]
+        if len(components) > 1:
+            last = components[1][-(limit - (len(ret) + len(cls.ELLIPSIS) + 1)):]
+            ret += '/' + cls.ELLIPSIS + last
+        return ret
 
-PATH_INDENT = '  '
+    @classmethod
+    def _indent(cls, name, depth, limit):
+        """Indent name by depth PATH_INDENTs constrained by limit"""
+        if (len(cls.PATH_INDENT) * depth) + len(name) > limit:
+            return (cls.ELLIPSIS + name).rjust(limit - 1)[:limit]
+        return (cls.PATH_INDENT * depth) + name
 
-def indent_dataset_path(name, depth, limit):
-    """Indent name by depth PATH_INDENTS constrained by limit"""
-    if (len(PATH_INDENT) * depth) + len(name) > limit:
-        return ('+' + name).rjust(limit - 1)[:limit]
-    return (PATH_INDENT * depth) + name
+    @classmethod
+    def indent(cls, name, last_path, limit):
+        """
+        Take a name and a prior split path (or an empty list), returning a
+        tuple of the indented set of lines to print as a prefix up to this
+        component, the indented current component, and the current path leading
+        to this one to be passed to the next call to indent_format.
+        """
+        cur_path = name.split('/')
+        common = os.path.commonprefix([last_path, cur_path])
+        prefix = []
+        for i, segment in enumerate(cur_path[len(common):-1]):
+            prefix.append(cls._indent(segment, len(common) + i, limit))
+        last_segment = cls._indent(cur_path[-1], len(cur_path) - 1, limit)
+        return ("\n".join(prefix), last_segment, cur_path)
 
-
-def print_format_dataset(name, last_path, limit, print=print):
-    """
-    Take a path, print any elements not in last_path, and return a formatted
-    name and a split path to be passed to the next call to this function
-    """
-    cur_path = name.split('/')
-    common = os.path.commonprefix([last_path, cur_path])
-    for i, segment in enumerate(cur_path[len(common):-1]):
-        print(indent_dataset_path(segment, len(common) + i, limit))
-
-    return (indent_dataset_path(cur_path[-1], len(cur_path) - 1, limit), cur_path)
-
-
-def indented_name_width(path):
-    """
-    Calculate the maximum width of this path as rendered by print_format_dataset
-    """
-    segments = path.split('/')
-    return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
+    @classmethod
+    def indent_len(cls, path):
+        """
+        Calculate the maximum width of this path as rendered by print_format
+        """
+        segments = path.split('/')
+        return (len(segments[0:-1]) * len(cls.PATH_INDENT)) + len(segments[-1])
 
 
 ################################################################################
@@ -569,11 +598,8 @@ def create_column_formatter(args):
         format_iops = round
         format_bytes = round
     else:
-        def format_iops(num):
-            return number_to_human(num, field_width, True)
-
-        def format_bytes(num):
-            return number_to_human(num, field_width, args.decimal)
+        format_iops = NumberToHuman.formatter(length=field_width, decimal=True)
+        format_bytes = NumberToHuman.formatter(length=field_width, decimal=args.decimal)
 
     formatter = ColumnFormatter(column_separator=column_separator, row_separator='-')
     formatter.add_column('dataset', just=name_just)
@@ -636,7 +662,7 @@ def main():
     args = parse_args()
     formatter = create_column_formatter(args)
 
-    calc_name_width = len if args.fullname else indented_name_width
+    calc_name_width = len if args.fullname else DatasetName.indent_len
     max_name_width = 0
 
     for iteration, diff in enumerate(create_diff_iter(args)):
@@ -669,10 +695,11 @@ def main():
         last_path = []
         for d in diff:
             if args.fullname:
-                name = d.name if args.exact else format_dataset(d.name, name_width)
+                name = d.name if args.exact else DatasetName.shorten(d.name, name_width)
             else:
-                name, last_path = print_format_dataset(d.name, last_path, name_width,
-                                                       print=formatter.print)
+                prefix, name, last_path = DatasetName.indent(d.name, last_path, name_width)
+                if prefix:
+                    formatter.print(prefix)
 
             if not args.perinterval:
                 d.normalize_per_second()
