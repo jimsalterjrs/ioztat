@@ -74,12 +74,12 @@ class Dataset:
 ################################################################################
 # Platform specific section
 #
-# Must implement parse_datasets(Optional[pool]): dict[str, Dataset]
+# Must implement fetch_datasets(pool=Optional[str]): dict[str, Dataset]
 ################################################################################
 if sys.platform.startswith("linux"):
     import glob
 
-    def parse_datasets(pool=None):
+    def fetch_datasets(pool=None):
         datasets = {}
         search = glob.escape(pool) if pool else '*'
         for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', search, 'objset-*')):
@@ -125,7 +125,7 @@ elif sys.platform.startswith("freebsd"):
 
     from collections import defaultdict
 
-    def parse_datasets(pool=None):
+    def fetch_datasets(pool=None):
         # We're interested in kstat.zfs.*.dataset.objset-*.*
         # Note objset ID's are only unique to individual pools
         oid = "kstat.zfs."
@@ -231,10 +231,10 @@ def dataset_iter(pools):
         while True:
             yield {name: dataset
                    for pool in pools
-                   for name, dataset in parse_datasets(pool).items()}
+                   for name, dataset in fetch_datasets(pool).items()}
     else:
         while True:
-            yield parse_datasets()
+            yield fetch_datasets()
 
 
 def diff_iter(pools):
