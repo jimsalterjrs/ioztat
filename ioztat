@@ -297,10 +297,7 @@ class Column:
         return self.justify(str(self.format(value)))
 
     def justify(self, string):
-        if self.just:
-            return self.just(string, self.width)
-        else:
-            return string
+        return self.just(string, self.width) if self.just else string
 
 
 class ColumnGroup:
@@ -317,11 +314,11 @@ class ColumnGroup:
         self.width = width
         self.just = just
 
+    def group_width(self):
+        return self.width + sum((c.width for c in self.columns))
+
     def justify(self, string):
-        if self.just:
-            return self.just(string, self.width + sum((c.width for c in self.columns)))
-        else:
-            return string
+        return self.just(string, self.group_width()) if self.just else string
 
 
 class ColumnFormatter:
