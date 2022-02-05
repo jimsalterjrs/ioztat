@@ -58,6 +58,8 @@ class Dataset:
     nread = 0
     writes = 0
     nwritten = 0
+    nunlinks = 0
+    nunlinked = 0
     timestamp = 0
 
     def __init__(self, data=None):
@@ -67,6 +69,8 @@ class Dataset:
             self.nread = int(data['nread'])
             self.writes = int(data['writes'])
             self.nwritten = int(data['nwritten'])
+            self.nunlinks = int(data['nunlinks'])
+            self.nunlinked = int(data['nunlinked'])
             self.timestamp = int(data['timestamp'])
 
 
@@ -156,6 +160,8 @@ class DatasetDiff:
     nread = 0
     writes = 0
     nwritten = 0
+    nunlinks = 0
+    nunlinked = 0
 
     def __init__(self, name=''):
         self.name = name
@@ -166,6 +172,8 @@ class DatasetDiff:
         self.nread = new.nread - old.nread
         self.writes = new.writes - old.writes
         self.nwritten = new.nwritten - old.nwritten
+        self.nunlinks = new.nunlinks - old.nunlinks
+        self.nunlinked = new.nunlinked - old.nunlinked
         return self
 
     @property
@@ -190,10 +198,12 @@ class DatasetDiff:
             self.nread /= self.timediff
             self.writes /= self.timediff
             self.nwritten /= self.timediff
+            self.nunlinks /= self.timediff
+            self.nunlinked /= self.timediff
 
     def is_nonzero(self):
         """True if this DatasetDiff has any non-zero deltas"""
-        return self.reads or self.writes or self.nread or self.nwritten
+        return self.reads or self.writes or self.nread or self.nwritten or self.nunlinks or self.nunlinked
 
     def __add__(self, other):
         new = DatasetDiff(self.name)
@@ -202,6 +212,8 @@ class DatasetDiff:
         new.nread = self.nread + other.nread
         new.writes = self.writes + other.writes
         new.nwritten = self.nwritten + other.nwritten
+        new.nunlinks = self.nunlinks + other.nunlinks
+        new.nunlinked = self.nunlinked + other.nunlinked
         return new
 
 
@@ -545,6 +557,8 @@ def parse_args():
                         help='prefix each report with a Unix timestamp or formatted date')
     parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + PROGRAM_VERSION,
                         help='display version number and exit')
+    parser.add_argument('-x', dest='extended', action='count', default=0,
+                        help='display extended statistics (twice for more)')
     parser.add_argument('-y', dest='skip', action='store_const', default=0, const=1,
                         help='omit the initial "summary" report')
     parser.add_argument('-z', dest='nonzero', action='store_true',
@@ -630,9 +644,14 @@ def create_column_formatter(args):
     formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
     formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
     formatter.add_group('throughput', 2)
-    formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
-    formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
-    formatter.add_group('opsize', 2)
+    if args.extended > 0:
+        formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
+        formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
+        formatter.add_group('opsize', 2)
+    if args.extended > 1:
+        formatter.add_column('queue',  width=field_width, format=format_iops, just=num_just)
+        formatter.add_column('done', width=field_width, format=format_iops, just=num_just)
+        formatter.add_group('unlinks', 2)
     return formatter
 
 
@@ -729,7 +748,7 @@ def main():
                 d.normalize_per_second()
 
             formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten,
-                                    d.rareq_sz, d.wareq_sz)
+                                    d.rareq_sz, d.wareq_sz, d.nunlinks, d.nunlinked)
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
