@@ -49,6 +49,7 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 ################################################################################
 
+
 class Dataset:
     timestamp = 0
     name = ''
@@ -57,7 +58,7 @@ class Dataset:
     reads = 0
     nread = 0
 
-    def __init__(self, data = None):
+    def __init__(self, data=None):
         if data:
             self.timestamp = int(data['timestamp'])
             self.name = data['dataset_name']
@@ -65,6 +66,7 @@ class Dataset:
             self.nread = int(data['nread'])
             self.writes = int(data['writes'])
             self.nwritten = int(data['nwritten'])
+
 
 ################################################################################
 # Platform specific section
@@ -74,7 +76,7 @@ class Dataset:
 if sys.platform.startswith("linux"):
     import glob
 
-    def parse_datasets(pool = None):
+    def parse_datasets(pool=None):
         datasets = {}
         search = glob.escape(pool) if pool else '*'
         for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', search, 'objset-*')):
@@ -102,7 +104,7 @@ elif sys.platform.startswith("freebsd"):
         import subprocess
 
         class SysctlOid:
-            def __init__(self, name = '', value = None):
+            def __init__(self, name='', value=None):
                 self.name = name
                 self.value = value
 
@@ -110,13 +112,13 @@ elif sys.platform.startswith("freebsd"):
             @staticmethod
             def filter(oid):
                 r = subprocess.run(["sysctl", "-e", oid],
-                        capture_output=True, check=True, encoding='latin-1')
+                                   capture_output=True, check=True, encoding='latin-1')
                 stats = [line.split("=", 2) for line in r.stdout.split("\n")]
                 return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
 
     from collections import defaultdict
 
-    def parse_datasets(pool = None):
+    def parse_datasets(pool=None):
         # We're interested in kstat.zfs.*.dataset.objset-*.*
         # Note objset ID's are only unique to individual pools
         oid = "kstat.zfs."
@@ -124,7 +126,7 @@ elif sys.platform.startswith("freebsd"):
             oid += pool + ".dataset."
 
         timestamp = time.monotonic_ns()
-        ds = defaultdict(lambda: { 'timestamp': timestamp })
+        ds = defaultdict(lambda: {'timestamp': timestamp})
         for ctl in sysctl.filter(oid):
             name = ctl.name.rsplit(".", 4)
             if len(name) == 5 and name[2] == 'dataset':
@@ -137,7 +139,9 @@ else:
     print("Unsupported platform: " + sys.platform)
     sys.exit(1)
 
+
 ################################################################################
+
 
 class DatasetDiff:
     timediff = 0
@@ -187,6 +191,7 @@ class DatasetDiff:
         new.nwritten = self.nwritten + other.nwritten
         return new
 
+
 def sumchildren(diffs):
     """
     Return Iterable[DatasetDiff] for Iterable[DatasetDiff] having added child
@@ -203,24 +208,28 @@ def sumchildren(diffs):
 
     return sums.values()
 
+
 def calc_diff(prevdatasets, datasets):
     return (DatasetDiff(key).diff(prevdatasets[key], datasets[key])
             for key in datasets.keys() & prevdatasets.keys())
 
+
 def calc_diff_from_start(datasets):
     zero = Dataset()
     return (DatasetDiff(name).diff(zero, dataset) for name, dataset in datasets.items())
+
 
 def dataset_iter(pools):
     """Iterate over dict[str, Dataset] for pools"""
     if pools:
         while True:
             yield {name: dataset
-                    for pool in pools
-                    for name, dataset in parse_datasets(pool).items()}
+                   for pool in pools
+                   for name, dataset in parse_datasets(pool).items()}
     else:
         while True:
             yield parse_datasets()
+
 
 def diff_iter(pools):
     """Iterate over Iterable[DatasetDiff] for pools"""
@@ -232,6 +241,7 @@ def diff_iter(pools):
     for datasets in it:
         yield calc_diff(prevdatasets, datasets)
         prevdatasets = datasets
+
 
 def interval_iter(it, interval):
     """Yield an item from the provided Iterable every interval seconds"""
@@ -248,17 +258,20 @@ def interval_iter(it, interval):
             deadline = time.monotonic() + interval
         deadline += interval
 
+
 def skip_iter(it, count):
     """Skip count iterations of the Iterable"""
     for _ in range(count):
         next(it, None)
     return it
 
+
 def take_iter(it, count):
     """Yield at most count items from Iterable"""
     while count > 0:
         yield next(it, None)
         count -= 1
+
 
 ################################################################################
 # Column formatting
@@ -279,6 +292,7 @@ class Column:
         else:
             return string
 
+
 class ColumnGroup:
     def __init__(self, name, columns, width=0, just=str.center):
         self.name = name
@@ -292,8 +306,9 @@ class ColumnGroup:
         else:
             return string
 
+
 class ColumnFormatter:
-    def __init__(self, column_separator = '  ', row_separator = '-', buffer = None):
+    def __init__(self, column_separator='  ', row_separator='-', buffer=None):
         self.columns = []
         self.groups = None
         self.column_separator = column_separator
@@ -343,9 +358,11 @@ class ColumnFormatter:
         print(buffer, end='')
         self.buffer.clear()
 
+
 class ColumnGroupFormatter(ColumnFormatter):
     def add_column(self, name, **args):
         self.columns.append(ColumnGroup(name, **args))
+
 
 ################################################################################
 # General formatting
@@ -356,7 +373,7 @@ POWERS_1000 = [pow(1000, i) for i in range(len(SIZE_PREFIX))]
 POWERS_1024 = [pow(1024, i) for i in range(len(SIZE_PREFIX))]
 FORMATS_BY_PRECISION = ['{:.2f}{}', '{:.1f}{}', '{:.0f}{}']
 
-def number_to_human(num, length, decimal = False):
+def number_to_human(num, length, decimal=False):
     """Format a number to a SI decimal or binary string representation that
     should fit within length bytes"""
     if decimal:
@@ -383,7 +400,8 @@ def number_to_human(num, length, decimal = False):
             return ret
     return ret
 
-def format_dataset(path, limit, ellipsis = '+'):
+
+def format_dataset(path, limit, ellipsis='+'):
     """Truncate a dataset name to a limit"""
     if len(path) <= limit:
         return path
@@ -395,12 +413,15 @@ def format_dataset(path, limit, ellipsis = '+'):
         ret += '/' + ellipsis + components[1][-(limit - (len(ret) + len(ellipsis) + 1)):]
     return ret
 
+
 PATH_INDENT = '  '
+
 def indent_dataset_path(name, depth, limit):
     """Indent name by depth PATH_INDENTS constrained by limit"""
     if (len(PATH_INDENT) * depth) + len(name) > limit:
         return ('+' + name).rjust(limit - 1)[:limit]
     return (PATH_INDENT * depth) + name
+
 
 def print_format_dataset(name, last_path, limit, print=print):
     """
@@ -414,12 +435,14 @@ def print_format_dataset(name, last_path, limit, print=print):
 
     return (indent_dataset_path(cur_path[-1], len(cur_path) - 1, limit), cur_path)
 
+
 def indented_name_width(path):
     """
     Calculate the maximum width of this path as rendered by print_format_dataset
     """
     segments = path.split('/')
     return (len(segments[0:-1]) * len(PATH_INDENT)) + len(segments[-1])
+
 
 ################################################################################
 # Argument processing, column formatting, and main loop
@@ -528,6 +551,7 @@ def parse_args():
 
     return args
 
+
 def create_column_formatter(args):
     """Create a ColumnFormatter instance configured for the given args"""
     if args.scripted:
@@ -541,10 +565,17 @@ def create_column_formatter(args):
         num_just = str.rjust
         field_width = 11 if args.exact else 5
 
-    format_iops = round if args.exact else lambda num: number_to_human(num, field_width, True)
-    format_bytes = round if args.exact else lambda num: number_to_human(num, field_width, args.decimal)
+    if args.exact:
+        format_iops = round
+        format_bytes = round
+    else:
+        def format_iops(num):
+            return number_to_human(num, field_width, True)
 
-    formatter = ColumnFormatter(column_separator = column_separator, row_separator = '-')
+        def format_bytes(num):
+            return number_to_human(num, field_width, args.decimal)
+
+    formatter = ColumnFormatter(column_separator=column_separator, row_separator='-')
     formatter.add_column('dataset', just=name_just)
     formatter.add_group()
     formatter.add_column('read',  width=field_width, format=format_iops, just=num_just)
@@ -557,6 +588,7 @@ def create_column_formatter(args):
     formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
     formatter.add_group('opsize', 2)
     return formatter
+
 
 def create_diff_iter(args):
     """Create an iterator over Iterable[DatasetDiff] for the given args"""
@@ -583,7 +615,7 @@ def create_diff_iter(args):
 
     if dataset_pattern:
         diff_loop = (filter(lambda diff: dataset_pattern.match(diff.name), diffs)
-                    for diffs in diff_loop)
+                     for diffs in diff_loop)
 
     if args.interval:
         diff_loop = interval_iter(diff_loop, args.interval)
@@ -598,6 +630,7 @@ def create_diff_iter(args):
         diff_loop = filter(None, diff_loop)
 
     return diff_loop
+
 
 def main():
     args = parse_args()
@@ -614,13 +647,14 @@ def main():
 
         width, height = shutil.get_terminal_size()
         avail_width = width - formatter.get_printed_width(1, 7)
-        max_name_width = max(max_name_width, max((calc_name_width(d.name) for d in diff), default=10))
+        max_name_width = max(max_name_width,
+                             max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
         formatter.set_column_width(0, name_width)
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
-            formatter.print("\033[2J\033[1;1H", end = '')
+            formatter.print("\033[2J\033[1;1H", end='')
 
         if args.timestamp == 'u':
             formatter.print(int(time.time()))
@@ -628,7 +662,7 @@ def main():
             formatter.print(time.strftime('%c'))
 
         if (not args.scripted) and (args.overwrite or iteration == 0 or
-          ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
+           ((not args.headeronce) and sys.stdout.isatty() and iteration % height == 0)):
             formatter.print_header()
             formatter.print_divider()
 
@@ -649,7 +683,8 @@ def main():
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
 
-        formatter.flush(lines = height if args.overwrite else None)
+        formatter.flush(lines=height if args.overwrite else None)
+
 
 if __name__ == '__main__':
     main()
