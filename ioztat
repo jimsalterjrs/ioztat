@@ -176,6 +176,14 @@ class DatasetDiff:
     def wareq_sz(self):
         return self.nwritten / self.writes if self.writes else 0
 
+    @property
+    def operations(self):
+        return self.reads + self.writes
+
+    @property
+    def throughput(self):
+        return self.nread + self.nwritten
+
     def normalize_per_second(self):
         if self.timediff:
             self.reads /= self.timediff
@@ -478,12 +486,12 @@ class DatasetName:
 
 SORTS = {
     'name':       {'key': lambda x: x.name},
-    'operations': {'key': lambda x: x.reads + x.writes,   'reverse': True},
-    'reads':      {'key': lambda x: x.reads,              'reverse': True},
-    'writes':     {'key': lambda x: x.writes,             'reverse': True},
-    'throughput': {'key': lambda x: x.nread + x.nwritten, 'reverse': True},
-    'nread':      {'key': lambda x: x.nread,              'reverse': True},
-    'nwritten':   {'key': lambda x: x.nwritten,           'reverse': True},
+    'operations': {'key': lambda x: x.operations, 'reverse': True},
+    'reads':      {'key': lambda x: x.reads,      'reverse': True},
+    'writes':     {'key': lambda x: x.writes,     'reverse': True},
+    'throughput': {'key': lambda x: x.throughput, 'reverse': True},
+    'nread':      {'key': lambda x: x.nread,      'reverse': True},
+    'nwritten':   {'key': lambda x: x.nwritten,   'reverse': True},
 }
 SORT_DISPLAY = list(SORTS.keys())
 SORT_ALIAS = {
