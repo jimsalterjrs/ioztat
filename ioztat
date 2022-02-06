@@ -714,7 +714,7 @@ def main():
             diff.sort(**SORTS[args.sort])
 
         width, height = shutil.get_terminal_size()
-        avail_width = width - formatter.get_printed_width(1, 7)
+        avail_width = width - formatter.get_printed_width(1)
         max_name_width = max(max_name_width,
                              max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
