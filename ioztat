@@ -305,14 +305,18 @@ class Column:
     Formats (translates raw value to string) and optionally justifies (adjusts
     the string to fit within a given width) a single column.
     """
-    def __init__(self, name, width=0, format=str, just=None):
-        self.name = name
+    def __init__(self, key, heading, width=0, format=str, just=None):
+        self.key = key
+        self.heading = heading
         self.width = width
         self.format = format
         self.just = just
 
-    def stringify(self, value):
-        return self.justify(str(self.format(value)))
+    def render(self, values):
+        return self.justify(str(self.format(values[self.key])))
+
+    def render_heading(self):
+        return self.justify(self.heading)
 
     def justify(self, string):
         return self.just(string, self.width) if self.just else string
@@ -326,14 +330,17 @@ class ColumnGroup:
     Width here is the size of separators not covered by the raw width of the
     spanned columns themselves.
     """
-    def __init__(self, name, columns, width=0, just=str.center):
-        self.name = name
+    def __init__(self, heading, columns, width=0, just=str.center):
+        self.heading = heading
         self.columns = columns
         self.width = width
         self.just = just
 
     def group_width(self):
         return self.width + sum((c.width for c in self.columns))
+
+    def render_heading(self):
+        return self.justify(self.heading)
 
     def justify(self, string):
         return self.just(string, self.group_width()) if self.just else string
@@ -345,15 +352,18 @@ class ColumnFormatter:
     """
     def __init__(self, column_separator='  ', row_separator='-', buffer=None):
         self.columns = []
+        self.column_index = {}
         self.groups = None
         self.column_separator = column_separator
         self.row_separator = row_separator
         self.buffer = buffer if buffer is not None else []
 
     def add_column(self, name, cls=Column, **args):
+        self.column_index[name] = len(self.columns)
         self.columns.append(cls(name, **args))
 
     def add_group(self, name='', colspan=1, just=str.center):
+        """Add a group heading that spans the previous colspan columns"""
         if self.groups is None:
             self.groups = ColumnFormatter(column_separator=self.column_separator,
                                           buffer=self.buffer)
@@ -361,25 +371,32 @@ class ColumnFormatter:
         self.groups.add_column(name, cls=ColumnGroup, columns=self.columns[-colspan:],
                                width=len(self.column_separator) * (colspan - 1), just=just)
 
-    def set_column_width(self, column, width):
-        self.columns[column].width = width
+    def add_row(self, **data):
+        """Add a row of data to be formatted into the internal buffer"""
+        formatted = (column.render(data) for column in self.columns)
+        self.print(self.column_separator.join(formatted))
+
+    def set_column_width(self, key, width):
+        """Set the width of the column"""
+        self.columns[self.column_index[key]].width = width
 
     def get_printed_width(self, start, stop=None):
         """Return the width of columns[start:stop]"""
         return sum((c.width + len(self.column_separator) for c in self.columns[start:stop]))
 
-    def print_columns(self, *columns):
-        formatted = (c.stringify(column) for (c, column) in zip(self.columns, columns))
-        self.print(self.column_separator.join(formatted))
-
     def print_header(self):
+        """Add headings and optionally group headings to the internal buffer"""
         if self.groups:
             self.groups.print_header()
 
-        formatted = (c.justify(c.name) for c in self.columns)
+        formatted = (column.render_heading() for column in self.columns)
         self.print(self.column_separator.join(formatted))
 
     def print_divider(self):
+        """
+        Add a line of column_separator in the space given to each column to the
+        internal buffer.
+        """
         self.print(
             self.column_separator.join(
                 [''.ljust(c.width, self.row_separator) for c in self.columns]))
@@ -393,9 +410,7 @@ class ColumnFormatter:
         self.buffer.append(string + end)
 
     def flush(self, lines=None):
-        """
-        Print the internal buffer, up to the optional lines limit.
-        """
+        """Print the internal buffer, up to the optional lines limit."""
         buffer = ''.join(self.buffer)
         if lines:
             buffer = "\n".join(buffer.split("\n", lines)[:lines])
@@ -629,28 +644,28 @@ def create_column_formatter(args):
         field_width = 11 if args.exact else 5
 
     if args.exact:
-        format_iops = round
+        format_num = round
         format_bytes = round
     else:
-        format_iops = NumberToHuman.formatter(length=field_width, decimal=True)
+        format_num = NumberToHuman.formatter(length=field_width, decimal=True)
         format_bytes = NumberToHuman.formatter(length=field_width, decimal=args.decimal)
 
     formatter = ColumnFormatter(column_separator=column_separator, row_separator='-')
-    formatter.add_column('dataset', just=name_just)
+    formatter.add_column('name', heading='dataset', just=name_just)
     formatter.add_group()
-    formatter.add_column('read',  width=field_width, format=format_iops, just=num_just)
-    formatter.add_column('write', width=field_width, format=format_iops, just=num_just)
+    formatter.add_column('reads', heading='read', width=field_width, format=format_num, just=num_just)
+    formatter.add_column('writes', heading='write', width=field_width, format=format_num, just=num_just)
     formatter.add_group('operations', 2)
-    formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
-    formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
+    formatter.add_column('nread', heading='read', width=field_width, format=format_bytes, just=num_just)
+    formatter.add_column('nwritten', heading='write', width=field_width, format=format_bytes, just=num_just)
     formatter.add_group('throughput', 2)
     if args.extended > 0:
-        formatter.add_column('read',  width=field_width, format=format_bytes, just=num_just)
-        formatter.add_column('write', width=field_width, format=format_bytes, just=num_just)
+        formatter.add_column('rareq_sz', heading='read', width=field_width, format=format_bytes, just=num_just)
+        formatter.add_column('wareq_sz', heading='write', width=field_width, format=format_bytes, just=num_just)
         formatter.add_group('opsize', 2)
     if args.extended > 1:
-        formatter.add_column('queue',  width=field_width, format=format_iops, just=num_just)
-        formatter.add_column('done', width=field_width, format=format_iops, just=num_just)
+        formatter.add_column('nunlinks', heading='queue', width=field_width, format=format_num, just=num_just)
+        formatter.add_column('nunlinked', heading='done', width=field_width, format=format_num, just=num_just)
         formatter.add_group('unlinks', 2)
     return formatter
 
@@ -718,7 +733,7 @@ def main():
         max_name_width = max(max_name_width,
                              max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
-        formatter.set_column_width(0, name_width)
+        formatter.set_column_width('name', name_width)
 
         if args.overwrite:
             # Clear the screen and move the cursor to the upper-left
@@ -747,8 +762,10 @@ def main():
             if not args.perinterval:
                 d.normalize_per_second()
 
-            formatter.print_columns(name, d.reads, d.writes, d.nread, d.nwritten,
-                                    d.rareq_sz, d.wareq_sz, d.nunlinks, d.nunlinked)
+            formatter.add_row(name=name, reads=d.reads, writes=d.writes,
+                              nread=d.nread, nwritten=d.nwritten,
+                              rareq_sz=d.rareq_sz, wareq_sz=d.wareq_sz,
+                              nunlinks=d.nunlinks, nunlinked=d.nunlinked)
 
         if not (args.scripted or args.overwrite):
             formatter.print_divider()
