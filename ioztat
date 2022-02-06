@@ -380,9 +380,14 @@ class ColumnFormatter:
         """Set the width of the column"""
         self.columns[self.column_index[key]].width = width
 
-    def get_printed_width(self, start, stop=None):
-        """Return the width of columns[start:stop]"""
-        return sum((c.width + len(self.column_separator) for c in self.columns[start:stop]))
+    def get_printed_width(self, exclude=()):
+        """
+        Return the printed width of columns and their separators, excluding the
+        keys in exclude.
+        """
+        return sum((c.width + len(self.column_separator)
+                   for c in self.columns
+                   if c.key not in exclude))
 
     def print_header(self):
         """Add headings and optionally group headings to the internal buffer"""
@@ -718,6 +723,7 @@ def main():
     args = parse_args()
     formatter = create_column_formatter(args)
 
+    stats_width = formatter.get_printed_width(exclude=('name'))
     calc_name_width = len if args.fullname else DatasetName.indent_len
     max_name_width = 0
     isatty = sys.stdout.isatty()
@@ -729,7 +735,7 @@ def main():
             diff.sort(**SORTS[args.sort])
 
         width, height = shutil.get_terminal_size()
-        avail_width = width - formatter.get_printed_width(1)
+        avail_width = width - stats_width
         max_name_width = max(max_name_width,
                              max((calc_name_width(d.name) for d in diff), default=10))
         name_width = max(10, min([avail_width, max_name_width]))
