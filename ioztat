@@ -650,28 +650,33 @@ def create_column_formatter(args):
         field_width = 11 if args.exact else 5
 
     if args.exact:
-        format_num = round
-        format_bytes = round
+        num_format = round
+        bytes_format = round
     else:
-        format_num = NumberToHuman.formatter(length=field_width, decimal=True)
-        format_bytes = NumberToHuman.formatter(length=field_width, decimal=args.decimal)
+        num_format = NumberToHuman.formatter(length=field_width, decimal=True)
+        bytes_format = NumberToHuman.formatter(length=field_width, decimal=args.decimal)
+
+    # Define our two types of data column from a shared base style
+    base = {'width': field_width, 'just': num_just}
+    num = {'format': num_format, **base}
+    byte = {'format': bytes_format, **base}
 
     formatter = ColumnFormatter(column_separator=column_separator, row_separator='-')
     formatter.add_column('name', heading='dataset', just=name_just)
     formatter.add_group()
-    formatter.add_column('reads', heading='read', width=field_width, format=format_num, just=num_just)
-    formatter.add_column('writes', heading='write', width=field_width, format=format_num, just=num_just)
+    formatter.add_column('reads', heading='read', **num)
+    formatter.add_column('writes', heading='write', **num)
     formatter.add_group('operations', 2)
-    formatter.add_column('nread', heading='read', width=field_width, format=format_bytes, just=num_just)
-    formatter.add_column('nwritten', heading='write', width=field_width, format=format_bytes, just=num_just)
+    formatter.add_column('nread', heading='read', **byte)
+    formatter.add_column('nwritten', heading='write', **byte)
     formatter.add_group('throughput', 2)
     if args.extended > 0:
-        formatter.add_column('rareq_sz', heading='read', width=field_width, format=format_bytes, just=num_just)
-        formatter.add_column('wareq_sz', heading='write', width=field_width, format=format_bytes, just=num_just)
+        formatter.add_column('rareq_sz', heading='read', **byte)
+        formatter.add_column('wareq_sz', heading='write', **byte)
         formatter.add_group('opsize', 2)
     if args.extended > 1:
-        formatter.add_column('nunlinks', heading='queue', width=field_width, format=format_num, just=num_just)
-        formatter.add_column('nunlinked', heading='done', width=field_width, format=format_num, just=num_just)
+        formatter.add_column('nunlinks', heading='queue', **num)
+        formatter.add_column('nunlinked', heading='done', **num)
         formatter.add_group('unlinks', 2)
     return formatter
 
