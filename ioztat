@@ -51,7 +51,7 @@ signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 class Dataset:
     """
-    ZFS dataset statistics with a nanosecond monotonic timestamp.
+    ZFS dataset statistics over a timespan in seconds
     """
     name = ''
     reads = 0
@@ -60,18 +60,77 @@ class Dataset:
     nwritten = 0
     nunlinks = 0
     nunlinked = 0
-    timestamp = 0
+    timespan = 0
 
-    def __init__(self, data=None):
-        if data:
-            self.name = data['dataset_name']
-            self.reads = int(data['reads'])
-            self.nread = int(data['nread'])
-            self.writes = int(data['writes'])
-            self.nwritten = int(data['nwritten'])
-            self.nunlinks = int(data['nunlinks'])
-            self.nunlinked = int(data['nunlinked'])
-            self.timestamp = int(data['timestamp'])
+    def __init__(self, name=''):
+        self.name = name
+
+    @classmethod
+    def from_dict(cls, data):
+        d = cls(data['dataset_name'])
+        d.reads = int(data['reads'])
+        d.nread = int(data['nread'])
+        d.writes = int(data['writes'])
+        d.nwritten = int(data['nwritten'])
+        d.nunlinks = int(data['nunlinks'])
+        d.nunlinked = int(data['nunlinked'])
+        d.timestamp = int(data['timestamp']) / 1e9
+        return d
+
+    def diff(self, new):
+        """
+        Create a new Dataset with the difference between this and a new Dataset
+        """
+        d = Dataset(new.name)
+        d.timespan = new.timespan - self.timespan
+        d.reads = new.reads - self.reads
+        d.nread = new.nread - self.nread
+        d.writes = new.writes - self.writes
+        d.nwritten = new.nwritten - self.nwritten
+        d.nunlinks = new.nunlinks - self.nunlinks
+        d.nunlinked = new.nunlinked - self.nunlinked
+        return d
+
+    @property
+    def rareq_sz(self):
+        return self.nread / self.reads if self.reads else 0
+
+    @property
+    def wareq_sz(self):
+        return self.nwritten / self.writes if self.writes else 0
+
+    @property
+    def operations(self):
+        return self.reads + self.writes
+
+    @property
+    def throughput(self):
+        return self.nread + self.nwritten
+
+    def per_second(self):
+        if self.timespan:
+            self.reads /= self.timespan
+            self.nread /= self.timespan
+            self.writes /= self.timespan
+            self.nwritten /= self.timespan
+            self.nunlinks /= self.timespan
+            self.nunlinked /= self.timespan
+        return self
+
+    def is_nonzero(self):
+        """True if this DatasetDiff has any non-zero deltas"""
+        return self.operations or self.throughput or self.nunlinks or self.nunlinked
+
+    def __add__(self, other):
+        new = Dataset(self.name)
+        new.timespan = max(self.timespan, other.timespan)
+        new.reads = self.reads + other.reads
+        new.nread = self.nread + other.nread
+        new.writes = self.writes + other.writes
+        new.nwritten = self.nwritten + other.nwritten
+        new.nunlinks = self.nunlinks + other.nunlinks
+        new.nunlinked = self.nunlinked + other.nunlinked
+        return new
 
 
 ################################################################################
@@ -98,7 +157,7 @@ if sys.platform.startswith("linux"):
                 with open(file, 'r', encoding='latin-1') as f:
                     header, _fieldnames, *fields = [line.split() for line in f]
                     fields.append(("timestamp", None, header[6]))
-                    ds = Dataset({field[0]: field[2] for field in fields if len(field) > 2})
+                    ds = Dataset.from_dict({field[0]: field[2] for field in fields if len(field) > 2})
                     datasets[ds.name] = ds
             except FileNotFoundError:
                 # Datasets may be destroyed between our globbing and opening
@@ -143,7 +202,7 @@ elif sys.platform.startswith("freebsd"):
                 _, pool, _, objset, oid = name
                 ds[(pool, objset)][oid] = ctl.value
 
-        return {dataset.name: dataset for dataset in map(Dataset, ds.values())}
+        return {dataset.name: dataset for dataset in map(Dataset.from_dict, ds.values())}
 
 else:
     print("Unsupported platform: " + sys.platform)
@@ -153,74 +212,9 @@ else:
 ################################################################################
 
 
-class DatasetDiff:
-    timediff = 0
-    name = ''
-    reads = 0
-    nread = 0
-    writes = 0
-    nwritten = 0
-    nunlinks = 0
-    nunlinked = 0
-
-    def __init__(self, name=''):
-        self.name = name
-
-    def diff(self, old, new):
-        self.timediff = (new.timestamp - old.timestamp) / 1e9
-        self.reads = new.reads - old.reads
-        self.nread = new.nread - old.nread
-        self.writes = new.writes - old.writes
-        self.nwritten = new.nwritten - old.nwritten
-        self.nunlinks = new.nunlinks - old.nunlinks
-        self.nunlinked = new.nunlinked - old.nunlinked
-        return self
-
-    @property
-    def rareq_sz(self):
-        return self.nread / self.reads if self.reads else 0
-
-    @property
-    def wareq_sz(self):
-        return self.nwritten / self.writes if self.writes else 0
-
-    @property
-    def operations(self):
-        return self.reads + self.writes
-
-    @property
-    def throughput(self):
-        return self.nread + self.nwritten
-
-    def per_second(self):
-        if self.timediff:
-            self.reads /= self.timediff
-            self.nread /= self.timediff
-            self.writes /= self.timediff
-            self.nwritten /= self.timediff
-            self.nunlinks /= self.timediff
-            self.nunlinked /= self.timediff
-        return self
-
-    def is_nonzero(self):
-        """True if this DatasetDiff has any non-zero deltas"""
-        return self.operations or self.throughput or self.nunlinks or self.nunlinked
-
-    def __add__(self, other):
-        new = DatasetDiff(self.name)
-        new.timediff = max(self.timediff, other.timediff)
-        new.reads = self.reads + other.reads
-        new.nread = self.nread + other.nread
-        new.writes = self.writes + other.writes
-        new.nwritten = self.nwritten + other.nwritten
-        new.nunlinks = self.nunlinks + other.nunlinks
-        new.nunlinked = self.nunlinked + other.nunlinked
-        return new
-
-
 def sum_children(diffs):
     """
-    Return Iterable[DatasetDiff] for Iterable[DatasetDiff] having added child
+    Return Iterable[Dataset] for Iterable[Dataset] having added child
     datasets to parents, creating them if necessary.
     """
     sums = {}
@@ -230,19 +224,9 @@ def sum_children(diffs):
             if path in sums:
                 sums[path] += diff
             else:
-                sums[path] = DatasetDiff(path) + diff
+                sums[path] = Dataset(path) + diff
 
     return sums.values()
-
-
-def calc_diff(prevdatasets, datasets):
-    return (DatasetDiff(key).diff(prevdatasets[key], datasets[key])
-            for key in datasets.keys() & prevdatasets.keys())
-
-
-def calc_diff_from_start(datasets):
-    zero = Dataset()
-    return (DatasetDiff(name).diff(zero, dataset) for name, dataset in datasets.items())
 
 
 def dataset_iter(pools):
@@ -258,14 +242,15 @@ def dataset_iter(pools):
 
 
 def diff_iter(pools):
-    """Iterate over Iterable[DatasetDiff] for pools"""
+    """Iterate over Iterable[Dataset] for pools"""
     it = dataset_iter(pools)
     prevdatasets = next(it, None)
     # yield the initial summary
-    yield calc_diff_from_start(prevdatasets)
+    yield prevdatasets.values()
 
     for datasets in it:
-        yield calc_diff(prevdatasets, datasets)
+        yield (prevdatasets[key].diff(datasets[key])
+            for key in datasets.keys() & prevdatasets.keys())
         prevdatasets = datasets
 
 
@@ -683,6 +668,10 @@ def create_column_formatter(args):
 
 
 class DatasetDiffIter:
+    """
+    Take an argument object and create an iterator over lists of Dataset diffs
+    with appropriate filtering and sorting applied.
+    """
     def __init__(self, args):
         pools = {dataset.split('/')[0] for dataset in args.dataset}
 
@@ -731,7 +720,7 @@ class DatasetDiffIter:
             # Filter out empty iterations if we're in normal mode.
             # We must coerce diffs into a list because this filters by the count,
             # and it may be a generator at this point
-            self.apply(lambda diffs: filter(None, list(diffs)))
+            self.iter = filter(None, map(list, self.iter))
 
         # Ensure we return a list from each iteration
         self.apply(list)
