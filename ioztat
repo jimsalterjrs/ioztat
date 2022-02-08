@@ -200,6 +200,7 @@ class DatasetDiff:
             self.nwritten /= self.timediff
             self.nunlinks /= self.timediff
             self.nunlinked /= self.timediff
+        return self
 
     def is_nonzero(self):
         """True if this DatasetDiff has any non-zero deltas"""
@@ -717,6 +718,16 @@ def create_diff_iter(args):
     if args.count:
         diff_loop = take_iter(diff_loop, args.count)
 
+    if not args.per_interval:
+        diff_loop = ((d.per_second() for d in diffs) for diffs in diff_loop)
+
+    if args.sort != 'name':
+        # Sorting by name first makes it a secondary sort field
+        diff_loop = (sorted(sorted(diffs, **SORTS['name']), **SORTS[args.sort])
+                     for diffs in diff_loop)
+    else:
+        diff_loop = (sorted(diffs, **SORTS['name']) for diffs in diff_loop)
+
     if not args.overwrite:
         # Filter out empty iterations if we're in normal mode.
         # Since this might yield generators we must cast to list first.
@@ -735,11 +746,6 @@ def main():
     isatty = sys.stdout.isatty()
 
     for iteration, diff in enumerate(create_diff_iter(args)):
-        # Always sort by name first, so the main sort has it as a secondary
-        diff = sorted(diff, **SORTS['name'])
-        if args.sort != 'name':
-            diff.sort(**SORTS[args.sort])
-
         width, height = shutil.get_terminal_size()
         avail_width = width - stats_width
         max_name_width = max(max_name_width,
@@ -773,9 +779,6 @@ def main():
                 prefix, name, last_path = DatasetName.indent(d.name, last_path, name_width)
                 if prefix:
                     formatter.print(prefix)
-
-            if not args.per_interval:
-                d.per_second()
 
             formatter.print_row(name=name, reads=d.reads, writes=d.writes,
                                 nread=d.nread, nwritten=d.nwritten,
