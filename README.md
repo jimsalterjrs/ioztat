@@ -23,7 +23,6 @@ ssd                   0      0      0      0      0      0
   iso                 0      0      0      0      0      0
   unsnapped           0      0      0      0      0      0
     rp9               0      0      0      0      0      0
-----------------  -----  -----  -----  -----  -----  -----
 ````
 
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.

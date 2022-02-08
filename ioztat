@@ -746,6 +746,9 @@ def main():
             # Clear the screen and move the cursor to the upper-left
             formatter.print("\033[2J\033[1;1H", end='')
 
+        if iteration > 0 and not (args.scripted or args.overwrite):
+            formatter.print_divider()
+
         if args.timestamp == 'u':
             formatter.print(int(time.time()))
         elif args.timestamp == 'd':
@@ -773,9 +776,6 @@ def main():
                               nread=d.nread, nwritten=d.nwritten,
                               rareq_sz=d.rareq_sz, wareq_sz=d.wareq_sz,
                               nunlinks=d.nunlinks, nunlinked=d.nunlinked)
-
-        if not (args.scripted or args.overwrite):
-            formatter.print_divider()
 
         formatter.flush(lines=height if args.overwrite else None)
 
