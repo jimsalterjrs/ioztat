@@ -83,3 +83,4 @@ The first release of `ioztat` builds on efforts from the Reddit r/zfs community,
 [#26]: https://github.com/jimsalterjrs/ioztat/pull/26
 [#31]: https://github.com/jimsalterjrs/ioztat/pull/31
 [#32]: https://github.com/jimsalterjrs/ioztat/pull/32
+[#33]: https://github.com/jimsalterjrs/ioztat/pull/33
