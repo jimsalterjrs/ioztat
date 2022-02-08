@@ -682,58 +682,74 @@ def create_column_formatter(args):
     return formatter
 
 
-def create_diff_iter(args):
-    """Create an iterator over Iterable[DatasetDiff] for the given args"""
-    pools = {dataset.split('/')[0] for dataset in args.dataset}
+class DatasetDiffIter:
+    def __init__(self, args):
+        pools = {dataset.split('/')[0] for dataset in args.dataset}
 
-    # Configure a chain of iterators appropriate for our arguments
-    diff_loop = diff_iter(pools)
+        # Configure a chain of iterators appropriate for our arguments
+        self.iter = diff_iter(pools)
 
-    if args.nonzero:
-        diff_loop = (filter(lambda diff: diff.is_nonzero(), diffs) for diffs in diff_loop)
+        if args.nonzero:
+            self.filter(lambda d: d.is_nonzero())
 
-    if args.sum_children:
-        diff_loop = (sum_children(diff) for diff in diff_loop)
+        if args.sum_children:
+            self.apply(sum_children)
 
-    if args.dataset:
-        # Cast to a faster structure for lookups
-        # In my testing a set is faster even for a single item.
-        args.dataset = set(args.dataset)
-        if args.non_recursive:
-            # Look only for the exact datasets specified
-            diff_loop = ((d for d in diffs if d.name in args.dataset)
-                         for diffs in diff_loop)
+        if args.dataset:
+            # Cast to a faster structure for lookups
+            # In my testing a set is faster even for a single item.
+            args.dataset = set(args.dataset)
+            if args.non_recursive:
+                # Look only for the exact datasets specified
+                self.filter(lambda d: d.name in args.dataset)
+            else:
+                # Also look for any that start with those plus a slash
+                starts = tuple((ds + '/' for ds in args.dataset))
+                self.filter(lambda d: d.name in args.dataset or d.name.startswith(starts))
+
+        if args.interval:
+            self.iter = interval_iter(self.iter, args.interval)
+
+        if args.skip:
+            self.iter = skip_iter(self.iter, args.skip)
+
+        if args.count:
+            self.iter = take_iter(self.iter, args.count)
+
+        if not args.per_interval:
+            self.map(lambda d: d.per_second())
+
+        if args.sort != 'name':
+            # Sorting by name first makes it a secondary sort field
+            self.apply(lambda diffs: sorted(sorted(diffs, **SORTS['name']), **SORTS[args.sort]))
         else:
-            # Also look for any that start with those plus a slash
-            starts = tuple((ds + '/' for ds in args.dataset))
-            diff_loop = ((d for d in diffs if d.name in args.dataset or d.name.startswith(starts))
-                         for diffs in diff_loop)
+            self.apply(lambda diffs: sorted(diffs, **SORTS['name']))
 
-    if args.interval:
-        diff_loop = interval_iter(diff_loop, args.interval)
+        # Ensure any prior generators are now executed and the data gathered
 
-    if args.skip:
-        diff_loop = skip_iter(diff_loop, args.skip)
+        if not args.overwrite:
+            # Filter out empty iterations if we're in normal mode.
+            # We must coerce diffs into a list because this filters by the count,
+            # and it may be a generator at this point
+            self.apply(lambda diffs: filter(None, list(diffs)))
 
-    if args.count:
-        diff_loop = take_iter(diff_loop, args.count)
+        # Ensure we return a list from each iteration
+        self.apply(list)
 
-    if not args.per_interval:
-        diff_loop = ((d.per_second() for d in diffs) for diffs in diff_loop)
+    def __iter__(self):
+        return self.iter
 
-    if args.sort != 'name':
-        # Sorting by name first makes it a secondary sort field
-        diff_loop = (sorted(sorted(diffs, **SORTS['name']), **SORTS[args.sort])
-                     for diffs in diff_loop)
-    else:
-        diff_loop = (sorted(diffs, **SORTS['name']) for diffs in diff_loop)
+    def filter(self, operation):
+        """Filter diffs by operation"""
+        self.iter = (filter(operation, diffs) for diffs in self.iter)
 
-    if not args.overwrite:
-        # Filter out empty iterations if we're in normal mode.
-        # Since this might yield generators we must cast to list first.
-        diff_loop = filter(None, map(list, diff_loop))
+    def map(self, operation):
+        """Apply operation to each diff"""
+        self.iter = (map(operation, diffs) for diffs in self.iter)
 
-    return diff_loop
+    def apply(self, operation):
+        """Apply operation to each set of diffs"""
+        self.iter = (operation(diffs) for diffs in self.iter)
 
 
 def main():
@@ -745,7 +761,7 @@ def main():
     max_name_width = 0
     isatty = sys.stdout.isatty()
 
-    for iteration, diff in enumerate(create_diff_iter(args)):
+    for iteration, diff in enumerate(DatasetDiffIter(args)):
         width, height = shutil.get_terminal_size()
         avail_width = width - stats_width
         max_name_width = max(max_name_width,
