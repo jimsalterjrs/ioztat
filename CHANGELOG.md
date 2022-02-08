@@ -13,6 +13,7 @@
 - `-S` flag for including child dataset statistics in parents [#32]
 - `-T d|u` flag for adding a timestamp to each report [#25]
 - `-V`, `--version` flags [#13] [#14]
+- `-x` flag for extended statistics, including unlink counts under `-xx` [#33]
 - `interval` and `count` positional arguments [#31]
 
 ### Changed
@@ -26,6 +27,11 @@
 - `count` now defaults to 1 unless an `interval` is specified [#31]
 - `dataset` is now an optional argument [#20]
 - Binary (1024-based) formatting is now default, with new `-D` flag for decimal
+- Average I/O sizes are now hidden beyind `-x` flag by default to reduce clutter [#33]
+
+### Removed
+
+- `-b` flag. Binary mode is now the default to match other iostat tools.
 
 ### Fixed
 
