@@ -203,7 +203,7 @@ class DatasetDiff:
 
     def is_nonzero(self):
         """True if this DatasetDiff has any non-zero deltas"""
-        return self.reads or self.writes or self.nread or self.nwritten or self.nunlinks or self.nunlinked
+        return self.operations or self.throughput or self.nunlinks or self.nunlinked
 
     def __add__(self, other):
         new = DatasetDiff(self.name)
