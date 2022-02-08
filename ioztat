@@ -641,7 +641,7 @@ class DatasetDiffIter:
         pools = {dataset.split('/')[0] for dataset in args.dataset}
 
         # Configure a chain of iterators appropriate for our arguments
-        self.iter = self._diff_iter(pools)
+        self.iter = DatasetDiffIter._diff_iter(pools)
 
         if args.nonzero:
             self.filter(lambda d: d.is_nonzero())
@@ -703,12 +703,15 @@ class DatasetDiffIter:
         """Apply operation to each set of diffs"""
         self.iter = (operation(diffs) for diffs in self.iter)
 
-    def _diff_iter(self, pools):
+    @staticmethod
+    def _diff_iter(pools):
         """Iterate over Iterable[Dataset] deltas"""
 
         dataset_fetcher = FetchDatasets(pools)
-        fetch_datasets = lambda: {d.name: d for d in
-                                  map(Dataset.from_dict, dataset_fetcher())}
+
+        def fetch_datasets():
+            return {d.name: d for d in
+                    map(Dataset.from_dict, dataset_fetcher())}
 
         prevdatasets = fetch_datasets()
         # yield the initial summary
@@ -716,7 +719,7 @@ class DatasetDiffIter:
 
         for datasets in iter(fetch_datasets, None):
             yield (datasets[key] - prevdatasets[key]
-                for key in datasets.keys() & prevdatasets.keys())
+                   for key in datasets.keys() & prevdatasets.keys())
             prevdatasets = datasets
 
     @staticmethod
