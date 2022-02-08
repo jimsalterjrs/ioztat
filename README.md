@@ -3,10 +3,10 @@ ioztat is a storage load analysis tool for OpenZFS. It provides iostat-like stat
 
 The statistics offered are read and write operations per second, read and write throughput per second, and the average size of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
 
-This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host:
+This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host, with extended statistics showing the average I/O size:
 
 ````
-root@redacted-prod0:~# ioztat -y ssd
+root@redacted-prod0:~# ioztat -yx ssd
                    operations    throughput      opsize
 dataset            read  write   read  write   read  write
 ----------------  -----  -----  -----  -----  -----  -----
