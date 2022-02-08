@@ -78,20 +78,6 @@ class Dataset:
         d.timespan = int(data['timestamp']) / 1e9
         return d
 
-    def diff(self, new):
-        """
-        Create a new Dataset with the difference between this and a new Dataset
-        """
-        d = Dataset(new.name)
-        d.timespan = new.timespan - self.timespan
-        d.reads = new.reads - self.reads
-        d.nread = new.nread - self.nread
-        d.writes = new.writes - self.writes
-        d.nwritten = new.nwritten - self.nwritten
-        d.nunlinks = new.nunlinks - self.nunlinks
-        d.nunlinked = new.nunlinked - self.nunlinked
-        return d
-
     @property
     def rareq_sz(self):
         return self.nread / self.reads if self.reads else 0
@@ -113,31 +99,51 @@ class Dataset:
         Return a copy of Dataset with values normalized to per-second rates
         """
         if self.timespan:
-            ps = copy.copy(self)
-            ps.reads /= self.timespan
-            ps.nread /= self.timespan
-            ps.writes /= self.timespan
-            ps.nwritten /= self.timespan
-            ps.nunlinks /= self.timespan
-            ps.nunlinked /= self.timespan
-            ps.timespan = 1.0
-            return ps
+            d = copy.copy(self)
+            d.reads /= self.timespan
+            d.nread /= self.timespan
+            d.writes /= self.timespan
+            d.nwritten /= self.timespan
+            d.nunlinks /= self.timespan
+            d.nunlinked /= self.timespan
+            d.timespan = 1.0
+            return d
         return self
 
     def is_nonzero(self):
         """True if this DatasetDiff has any non-zero deltas"""
         return self.operations or self.throughput or self.nunlinks or self.nunlinked
 
+    def __sub__(self, other):
+        """
+        Return a new Dataset with this one's values subtracted from other
+        """
+        d = copy.copy(self)
+        d.reads -= other.reads
+        d.nread -= other.nread
+        d.writes -= other.writes
+        d.nwritten -= other.nwritten
+        d.nunlinks -= other.nunlinks
+        d.nunlinked -= other.nunlinked
+        d.timespan -= other.timespan
+        return d
+
     def __add__(self, other):
-        new = Dataset(self.name)
-        new.timespan = max(self.timespan, other.timespan)
-        new.reads = self.reads + other.reads
-        new.nread = self.nread + other.nread
-        new.writes = self.writes + other.writes
-        new.nwritten = self.nwritten + other.nwritten
-        new.nunlinks = self.nunlinks + other.nunlinks
-        new.nunlinked = self.nunlinked + other.nunlinked
-        return new
+        """
+        Return a new Dataset with this one's values added to other
+
+        Note timespan is set to the maximum of the two values instead of being
+        added.
+        """
+        d = copy.copy(self)
+        d.reads += other.reads
+        d.nread += other.nread
+        d.writes += other.writes
+        d.nwritten += other.nwritten
+        d.nunlinks += other.nunlinks
+        d.nunlinked += other.nunlinked
+        d.timespan = max(d.timespan, other.timespan)
+        return d
 
 
 ################################################################################
@@ -252,8 +258,8 @@ def diff_iter(pools):
     yield prevdatasets.values()
 
     for datasets in iter(lambda: fetch_datasets(pools), None):
-        yield (prevdatasets[key].diff(datasets[key])
-            for key in datasets.keys() & prevdatasets.keys())
+        yield (datasets[key] - prevdatasets[key]
+               for key in datasets.keys() & prevdatasets.keys())
         prevdatasets = datasets
 
 
