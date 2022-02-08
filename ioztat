@@ -38,7 +38,6 @@ import time
 
 PROGRAM_VERSION = '2.0.0-dev'
 
-################################################################################
 # We have little interesting to do with these signals - restore default handlers
 # so our WIFSIGNALED() state propagates properly to the shell
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -47,8 +46,111 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 # If we ever need to restore standard Python behaviour, catch BrokenPipeError in
 # our print() calls, restore the handler and then re-raise the signal.
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-################################################################################
 
+
+# Platform specific section
+#
+# Must implement:
+#
+#   DatasetDict =  dict[dataset_name=str, timestamp=int|str, reads=int|str,
+#                       writes=int|str, nread=int|str, nwritten=int|str,
+#                       nunlinks=int|str, nunlinked=int|str]
+#   FetchDatasets(pools=Optional[list[str]]): Callable: Iterable[DatasetDict]
+#
+# i.e. a callable factory (likely a class) that takes an optional list of pools,
+# and returns a callable that returns a new batch of dicts conforming to
+# DatasetDict.
+#
+# timestamp is a nanosecond monotonic counter, e.g. time.monotonic_ns()
+if sys.platform.startswith("linux"):
+    import glob
+
+    class FetchDatasets:
+        def __init__(self, pools=None):
+            if pools:
+                patterns = map(glob.escape, pools)
+            else:
+                patterns = ['*']
+
+            self.globs = [os.path.join('/proc/spl/kstat/zfs', pattern, 'objset-*')
+                          for pattern in patterns]
+
+        def __call__(self):
+            datasets = []
+
+            for pattern in self.globs:
+                for file in glob.glob(pattern):
+                    # Shortened example of these files:
+                    #############################################
+                    # 31 1 0x01 7 2160 6165792836 1634992995579
+                    # name             type data
+                    # dataset_name     7    rpool/ROOT/default
+                    #############################################
+                    # Field 7 of the header is a nanosecond data snapshot timestamp.
+                    # Conveniently, dataset names may not contain spaces.
+                    try:
+                        with open(file, 'r', encoding='latin-1') as f:
+                            header, _fieldnames, *fields = [line.split() for line in f]
+                            fields.append(("timestamp", None, header[6]))
+                            datasets.append({field[0]: field[2]
+                                            for field in fields if len(field) > 2})
+                    except FileNotFoundError:
+                        # Datasets may be destroyed between our globbing and opening
+                        pass
+            return datasets
+
+elif sys.platform.startswith("freebsd"):
+    try:
+        # Attempt to use py-sysctl if available for best performance
+        import sysctl
+    except ImportError:
+        # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
+        import subprocess
+
+        class SysctlOid:
+            def __init__(self, name='', value=None):
+                self.name = name
+                self.value = value
+
+        class sysctl:
+            @staticmethod
+            def filter(oid):
+                r = subprocess.run(["sysctl", "-e", oid],
+                                   capture_output=True, check=False, encoding='latin-1')
+                stats = (line.split("=", 2) for line in r.stdout.split("\n"))
+                return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
+
+    from collections import defaultdict
+
+    class FetchDatasets:
+        def __init__(self, pools=None):
+            # We're interested in kstat.zfs.*.dataset.objset-*.*
+            if pools:
+                self.oids = (f'kstat.zfs.{pool}.dataset.' for pool in pools)
+            else:
+                self.oids = ('kstat.zfs.',)
+
+        def __call__(self):
+            timestamp = time.monotonic_ns()
+            datasets = defaultdict(lambda: {'timestamp': timestamp})
+
+            # Note objset ID's are only unique to individual pools
+            for oid in self.oids:
+                for ctl in sysctl.filter(oid):
+                    name = ctl.name.rsplit(".", 4)
+                    if len(name) == 5 and name[2] == 'dataset':
+                        _, pool, _, objset, oid = name
+                        datasets[(pool, objset)][oid] = ctl.value
+
+            return datasets.values()
+
+else:
+    print("Unsupported platform: " + sys.platform)
+    sys.exit(1)
+
+
+################################################################################
+# Core type
 
 class Dataset:
     """
@@ -94,6 +196,10 @@ class Dataset:
     def throughput(self):
         return self.nread + self.nwritten
 
+    def is_nonzero(self):
+        """True if this DatasetDiff has any non-zero deltas"""
+        return self.operations or self.throughput or self.nunlinks or self.nunlinked
+
     def per_second(self):
         """
         Return a copy of Dataset with values normalized to per-second rates
@@ -109,10 +215,6 @@ class Dataset:
             d.timespan = 1.0
             return d
         return self
-
-    def is_nonzero(self):
-        """True if this DatasetDiff has any non-zero deltas"""
-        return self.operations or self.throughput or self.nunlinks or self.nunlinked
 
     def __sub__(self, other):
         """
@@ -144,91 +246,6 @@ class Dataset:
         d.nunlinked += other.nunlinked
         d.timespan = max(d.timespan, other.timespan)
         return d
-
-
-################################################################################
-# Platform specific section
-#
-# Must implement fetch_datasets(pool=Optional[list[str]]): dict[str, Dataset]
-################################################################################
-if sys.platform.startswith("linux"):
-    import glob
-
-    def fetch_datasets(pools=None):
-        datasets = {}
-
-        if pools:
-            patterns = map(glob.escape, pools)
-        else:
-            patterns = ['*']
-
-        for pattern in patterns:
-            for file in glob.glob(os.path.join('/proc/spl/kstat/zfs', pattern, 'objset-*')):
-                # Shortened example of these files:
-                #############################################
-                # 31 1 0x01 7 2160 6165792836 1634992995579
-                # name             type data
-                # dataset_name     7    rpool/ROOT/default
-                #############################################
-                # Field 7 of the header is a nanosecond data snapshot timestamp.
-                # Conveniently, dataset names may not contain spaces.
-                try:
-                    with open(file, 'r', encoding='latin-1') as f:
-                        header, _fieldnames, *fields = [line.split() for line in f]
-                        fields.append(("timestamp", None, header[6]))
-                        ds = Dataset.from_dict({field[0]: field[2] for field in fields if len(field) > 2})
-                        datasets[ds.name] = ds
-                except FileNotFoundError:
-                    # Datasets may be destroyed between our globbing and opening
-                    pass
-        return datasets
-
-elif sys.platform.startswith("freebsd"):
-    try:
-        # Attempt to use py-sysctl if available for best performance
-        import sysctl
-    except ImportError:
-        # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
-        import subprocess
-
-        class SysctlOid:
-            def __init__(self, name='', value=None):
-                self.name = name
-                self.value = value
-
-        class sysctl:
-            @staticmethod
-            def filter(oid):
-                r = subprocess.run(["sysctl", "-e", oid],
-                                   capture_output=True, check=False, encoding='latin-1')
-                stats = (line.split("=", 2) for line in r.stdout.split("\n"))
-                return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
-
-    from collections import defaultdict
-
-    def fetch_datasets(pools=None):
-        # We're interested in kstat.zfs.*.dataset.objset-*.*
-        # Note objset ID's are only unique to individual pools
-        if pools:
-            oids = (f'kstat.zfs.{pool}.dataset.' for pool in pools)
-        else:
-            oids = ('kstat.zfs.',)
-
-        timestamp = time.monotonic_ns()
-        ds = defaultdict(lambda: {'timestamp': timestamp})
-
-        for oid in oids:
-            for ctl in sysctl.filter(oid):
-                name = ctl.name.rsplit(".", 4)
-                if len(name) == 5 and name[2] == 'dataset':
-                    _, pool, _, objset, oid = name
-                    ds[(pool, objset)][oid] = ctl.value
-
-        return {dataset.name: dataset for dataset in map(Dataset.from_dict, ds.values())}
-
-else:
-    print("Unsupported platform: " + sys.platform)
-    sys.exit(1)
 
 
 ################################################################################
@@ -686,14 +703,18 @@ class DatasetDiffIter:
         """Apply operation to each set of diffs"""
         self.iter = (operation(diffs) for diffs in self.iter)
 
-    @staticmethod
-    def _diff_iter(pools):
-        """Iterate over Iterable[Dataset] deltas for pools"""
-        prevdatasets = fetch_datasets(pools)
+    def _diff_iter(self, pools):
+        """Iterate over Iterable[Dataset] deltas"""
+
+        dataset_fetcher = FetchDatasets(pools)
+        fetch_datasets = lambda: {d.name: d for d in
+                                  map(Dataset.from_dict, dataset_fetcher())}
+
+        prevdatasets = fetch_datasets()
         # yield the initial summary
         yield prevdatasets.values()
 
-        for datasets in iter(lambda: fetch_datasets(pools), None):
+        for datasets in iter(fetch_datasets, None):
             yield (datasets[key] - prevdatasets[key]
                 for key in datasets.keys() & prevdatasets.keys())
             prevdatasets = datasets
