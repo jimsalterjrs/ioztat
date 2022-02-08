@@ -232,60 +232,6 @@ else:
 
 
 ################################################################################
-
-
-def sum_children(diffs):
-    """
-    Return Iterable[Dataset] for Iterable[Dataset] having added child
-    datasets to parents, creating them if necessary.
-    """
-    sums = {}
-    for diff in diffs:
-        for depth in range(diff.name.count('/') + 1):
-            path, *_ = diff.name.rsplit('/', depth)
-            if path in sums:
-                sums[path] += diff
-            else:
-                sums[path] = Dataset(path) + diff
-
-    return sums.values()
-
-
-def diff_iter(pools):
-    """Iterate over Iterable[Dataset] for pools"""
-    prevdatasets = fetch_datasets(pools)
-    # yield the initial summary
-    yield prevdatasets.values()
-
-    for datasets in iter(lambda: fetch_datasets(pools), None):
-        yield (datasets[key] - prevdatasets[key]
-               for key in datasets.keys() & prevdatasets.keys())
-        prevdatasets = datasets
-
-
-def interval_iter(it, interval):
-    """Yield an item from the provided Iterable every interval seconds"""
-    deadline = time.monotonic() + interval
-    for item in it:
-        yield item
-        sleep = deadline - time.monotonic()
-        if sleep > 0:
-            time.sleep(sleep)
-        else:
-            # We've fallen behind, possible due to being suspended, or the user
-            # has asked for an interval below our redraw time.
-            # Reset the interval, repeat the loop, and hope for better next time.
-            deadline = time.monotonic() + interval
-        deadline += interval
-
-
-def take_iter(it, count):
-    """Yield at most count items from Iterable"""
-    for _ in range(count):
-        yield next(it, None)
-
-
-################################################################################
 # String formatting
 
 class Column:
@@ -678,13 +624,13 @@ class DatasetDiffIter:
         pools = {dataset.split('/')[0] for dataset in args.dataset}
 
         # Configure a chain of iterators appropriate for our arguments
-        self.iter = diff_iter(pools)
+        self.iter = self._diff_iter(pools)
 
         if args.nonzero:
             self.filter(lambda d: d.is_nonzero())
 
         if args.sum_children:
-            self.apply(sum_children)
+            self.apply(self._sum_children)
 
         if args.dataset:
             # Cast to a faster structure for lookups
@@ -699,13 +645,13 @@ class DatasetDiffIter:
                 self.filter(lambda d: d.name in args.dataset or d.name.startswith(starts))
 
         if args.interval:
-            self.iter = interval_iter(self.iter, args.interval)
+            self.iter = self._interval_iter(self.iter, args.interval)
 
         for _ in range(args.skip):
             next(self.iter, None)
 
         if args.count:
-            self.iter = take_iter(self.iter, args.count)
+            self.iter = self._take_iter(self.iter, args.count)
 
         if not args.per_interval:
             self.map(lambda d: d.per_second())
@@ -739,6 +685,57 @@ class DatasetDiffIter:
     def apply(self, operation):
         """Apply operation to each set of diffs"""
         self.iter = (operation(diffs) for diffs in self.iter)
+
+    @staticmethod
+    def _diff_iter(pools):
+        """Iterate over Iterable[Dataset] deltas for pools"""
+        prevdatasets = fetch_datasets(pools)
+        # yield the initial summary
+        yield prevdatasets.values()
+
+        for datasets in iter(lambda: fetch_datasets(pools), None):
+            yield (datasets[key] - prevdatasets[key]
+                for key in datasets.keys() & prevdatasets.keys())
+            prevdatasets = datasets
+
+    @staticmethod
+    def _sum_children(diffs):
+        """
+        Return Iterable[Dataset] for Iterable[Dataset] having added child
+        datasets to parents, creating them if necessary.
+        """
+        sums = {}
+        for diff in diffs:
+            for depth in range(diff.name.count('/') + 1):
+                path, *_ = diff.name.rsplit('/', depth)
+                if path in sums:
+                    sums[path] += diff
+                else:
+                    sums[path] = Dataset(path) + diff
+
+        return sums.values()
+
+    @staticmethod
+    def _interval_iter(it, interval):
+        """Yield an item from the provided Iterable every interval seconds"""
+        deadline = time.monotonic() + interval
+        for item in it:
+            yield item
+            sleep = deadline - time.monotonic()
+            if sleep > 0:
+                time.sleep(sleep)
+            else:
+                # We've fallen behind, possible due to being suspended, or the user
+                # has asked for an interval below our redraw time.
+                # Reset the interval, repeat the loop, and hope for better next time.
+                deadline = time.monotonic() + interval
+            deadline += interval
+
+    @staticmethod
+    def _take_iter(it, count):
+        """Yield at most count items from Iterable"""
+        for _ in range(count):
+            yield next(it, None)
 
 
 def main():
