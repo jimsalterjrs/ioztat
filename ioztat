@@ -28,6 +28,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import copy
 import math
 import os
 import shutil
@@ -74,7 +75,7 @@ class Dataset:
         d.nwritten = int(data['nwritten'])
         d.nunlinks = int(data['nunlinks'])
         d.nunlinked = int(data['nunlinked'])
-        d.timestamp = int(data['timestamp']) / 1e9
+        d.timespan = int(data['timestamp']) / 1e9
         return d
 
     def diff(self, new):
@@ -108,13 +109,19 @@ class Dataset:
         return self.nread + self.nwritten
 
     def per_second(self):
+        """
+        Return a copy of Dataset with values normalized to per-second rates
+        """
         if self.timespan:
-            self.reads /= self.timespan
-            self.nread /= self.timespan
-            self.writes /= self.timespan
-            self.nwritten /= self.timespan
-            self.nunlinks /= self.timespan
-            self.nunlinked /= self.timespan
+            ps = copy.copy(self)
+            ps.reads /= self.timespan
+            ps.nread /= self.timespan
+            ps.writes /= self.timespan
+            ps.nwritten /= self.timespan
+            ps.nunlinks /= self.timespan
+            ps.nunlinked /= self.timespan
+            ps.timespan = 1.0
+            return ps
         return self
 
     def is_nonzero(self):
@@ -706,8 +713,6 @@ class DatasetDiffIter:
             self.apply(lambda diffs: sorted(sorted(diffs, **SORTS['name']), **SORTS[args.sort]))
         else:
             self.apply(lambda diffs: sorted(diffs, **SORTS['name']))
-
-        # Ensure any prior generators are now executed and the data gathered
 
         if not args.overwrite:
             # Filter out empty iterations if we're in normal mode.
