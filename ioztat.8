@@ -13,7 +13,7 @@
 .Fl h | Fl -help
 .
 .Nm
-.Op Fl DeHINnoSyz
+.Op Fl DeHINnoSxyz
 .Op Fl c Ar count
 .Op Fl i Ar interval
 .Op Fl T Ar u Ns | Ns d
@@ -126,6 +126,11 @@ for a formatted date-time.
 Display the current version of
 .Nm
 and exit.
+.It Fl x
+Specified once, display an opsize group containing throughput divided by operations,
+giving the average byte size of each I/O.
+Specified twice, also display an unlinks section giving a count of the number of
+files and directories queued for deletion, and the number which have been deleted.
 .It Fl y
 Omit statistics since boot.
 This suppresses output for the first

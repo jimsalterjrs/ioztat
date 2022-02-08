@@ -29,8 +29,10 @@ ssd                   0      0      0      0      0      0
 For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
 
 ````
-usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-I] [-i INTERVAL] [-N] [-n] [-o] [-P | -p] [-S]
-              [-s {name,operations,reads,writes,throughput,nread,nwritten}] [-T {u,d}] [-V] [-y] [-z]
+usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-I] [-i INTERVAL] [-N] [-n] [-o]
+              [-P | -p] [-S]
+              [-s {name,operations,reads,writes,throughput,nread,nwritten}]
+              [-T {u,d}] [-V] [-x] [-y] [-z]
               [dataset [dataset ...]] [interval [count]]
 
 iostat for ZFS datasets
@@ -41,12 +43,13 @@ positional arguments:
 
 optional arguments:
   -c COUNT              number of reports generated
-  -D                    display bytes in decimal powers of 1000 instead of 1024
+  -D                    display size in decimal powers of 1000 instead of 1024
   -e                    display exact values without truncation or scaling
   -H                    scripted mode, omit headers and tab-separate fields
   -h, --help            display this help message and exit
-  -I                    display totals since the last update rather than averaged per-second
-  -i INTERVAL           interval between reports (in seconds)
+  -I                    display totals since the last report rather than
+                        averaged per-second
+  -i INTERVAL           interval between reports in seconds
   -N                    display headers at most once
   -n                    omit child datasets when filtering
   -o                    overwrite old reports in terminal
@@ -55,8 +58,10 @@ optional arguments:
   -S                    include statistics for child datasets in parents
   -s {name,operations,reads,writes,throughput,nread,nwritten}
                         sort by the specified field
-  -T {u,d}              prefix each report with a Unix timestamp or formatted date
+  -T {u,d}              prefix reports with a Unix timestamp or formatted date
   -V, --version         display version number and exit
+  -x                    display extended statistics: once for average I/O
+                        size, twice for unlink queue
   -y                    omit the initial "summary" report
   -z                    omit datasets with zero activity
   ````
