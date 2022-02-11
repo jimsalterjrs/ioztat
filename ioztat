@@ -144,7 +144,7 @@ elif sys.platform.startswith("freebsd"):
             return datasets.values()
 
 else:
-    print("Unsupported platform: " + sys.platform)
+    print("Unsupported platform: " + sys.platform, file=sys.stderr)
     sys.exit(1)
 
 
