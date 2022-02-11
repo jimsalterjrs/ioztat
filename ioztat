@@ -31,6 +31,7 @@ import argparse
 import copy
 import math
 import os
+import re
 import shutil
 import signal
 import sys
@@ -536,14 +537,6 @@ def parse_args():
 
     args = parser.parse_args()
 
-    # Sanitize dataset list
-    trailing_slash = [ds for ds in args.dataset if ds.endswith('/')]
-    if trailing_slash:
-        parser.error(f"trailing slash in datasets: {', '.join(trailing_slash)}")
-
-    if [ds for ds in args.dataset if len(ds) == 0]:
-        parser.error("empty dataset name specified")
-
     # Handle [interval [count]]
     def is_positive_float(value):
         try:
@@ -559,6 +552,25 @@ def parse_args():
         if len(args.dataset) > 0 and is_positive_float(args.dataset[-1]):
             args.count = int(round(args.interval))
             args.interval = float(args.dataset.pop())
+
+    # Sanitize specified datasets according to ZFS rules.
+    #
+    # This helps defend against platform-specific code being passed arbitrary
+    # strings which might interact unpredictably with constructing paths or
+    # command lines, and also makes typos a bit more obvious to the user.
+    #
+    # Technically the regexp is enough, but try to provide helpful error messages
+    # for common errors.
+    dataset_pattern = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_.:-]*(?:/[a-zA-Z0-9_.:-]+)*\Z')
+    for ds in args.dataset:
+        if ds.endswith('/'):
+            parser.error(f"trailing slash in dataset name: '{ds}'")
+
+        if '//' in ds:
+            parser.error(f"empty component in dataset name: '{ds}'")
+
+        if not dataset_pattern.match(ds):
+            parser.error(f"invalid dataset name: '{ds}'")
 
     # Past here interval and count are either None or non-zero
     if args.count is not None and not args.count > 0:
