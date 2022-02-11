@@ -553,6 +553,21 @@ def parse_args():
             args.count = int(round(args.interval))
             args.interval = float(args.dataset.pop())
 
+    # Past here interval and count are either None or non-zero
+    if args.count is not None and not args.count > 0:
+        parser.error('count must be positive')
+    if args.interval is not None and not is_positive_float(args.interval):
+        parser.error('interval must be positive')
+
+    # If there's a count but no interval, default to one second
+    if args.count and not args.interval:
+        args.interval = 1.0
+
+    # If neither are specified, default to one iteration and one second
+    if not (args.count or args.interval):
+        args.count = 1
+        args.interval = 1.0
+
     # Sanitize specified datasets according to ZFS rules.
     #
     # This helps defend against platform-specific code being passed arbitrary
@@ -571,21 +586,6 @@ def parse_args():
 
         if not dataset_pattern.match(ds):
             parser.error(f"invalid dataset name: '{ds}'")
-
-    # Past here interval and count are either None or non-zero
-    if args.count is not None and not args.count > 0:
-        parser.error('count must be positive')
-    if args.interval is not None and not is_positive_float(args.interval):
-        parser.error('interval must be positive')
-
-    # If there's a count but no interval, default to one second
-    if args.count and not args.interval:
-        args.interval = 1.0
-
-    # If neither are specified, default to one iteration and one second
-    if not (args.count or args.interval):
-        args.count = 1
-        args.interval = 1.0
 
     # Enable full paths if we're not sorting by name or in nonzero mode, unless otherwise specified
     if args.fullname is None:
