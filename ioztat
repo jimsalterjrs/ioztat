@@ -648,10 +648,8 @@ class DatasetDiffIter:
     with appropriate filtering and sorting applied.
     """
     def __init__(self, args):
-        pools = {dataset.split('/')[0] for dataset in args.dataset}
-
         # Configure a chain of iterators appropriate for our arguments
-        self.iter = DatasetDiffIter._diff_iter(pools)
+        self.iter = self._diff_iter(args)
 
         if args.nonzero:
             self.filter(lambda d: d.is_nonzero())
@@ -713,24 +711,52 @@ class DatasetDiffIter:
         """Apply operation to each set of diffs"""
         self.iter = (operation(diffs) for diffs in self.iter)
 
-    @staticmethod
-    def _diff_iter(pools):
+    @classmethod
+    def _diff_iter(cls, args):
         """Iterate over Iterable[Dataset] deltas"""
 
+        pools = {dataset.split('/')[0] for dataset in args.dataset}
         dataset_fetcher = FetchDatasets(pools)
 
         def fetch_datasets():
             return {d.name: d for d in
                     map(Dataset.from_dict, dataset_fetcher())}
 
-        prevdatasets = fetch_datasets()
-        # yield the initial summary
-        yield prevdatasets.values()
+        summary = fetch_datasets()
+        cls._validate_dataset_args(args, summary.keys())
+        yield summary.values()
 
+        prevdatasets = summary
         for datasets in iter(fetch_datasets, None):
             yield (datasets[key] - prevdatasets[key]
                    for key in datasets.keys() & prevdatasets.keys())
             prevdatasets = datasets
+
+    @staticmethod
+    def _validate_dataset_args(args, found):
+        """
+        If any specified datasets are not present in the found list, exit with
+        an error message.
+        """
+        failed = False
+        for ds in args.dataset:
+            if ds in found:
+                continue
+
+            children = any(os.path.commonpath((ds, path)) == ds for path in found)
+            if args.non_recursive:
+                if children:
+                    msg = 'mounted'
+                else:
+                    msg = 'found'
+                print(f"dataset not {msg}: '{ds}'", file=sys.stderr)
+                failed = True
+            elif not children:
+                print(f"dataset not found: '{ds}'", file=sys.stderr)
+                failed = True
+
+        if failed:
+            sys.exit(1)
 
     @staticmethod
     def _sum_children(diffs):

@@ -28,6 +28,7 @@
 - `dataset` is now an optional argument [#20]
 - Binary (1024-based) formatting is now default, with new `-D` flag for decimal
 - Average I/O sizes are now hidden beyind `-x` flag by default to reduce clutter [#33]
+- Exit with an error if a requested dataset does not exist or is not mounted
 
 ### Removed
 
