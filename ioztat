@@ -103,22 +103,21 @@ elif sys.platform.startswith("freebsd"):
     try:
         # Attempt to use py-sysctl if available for best performance
         import sysctl
+
+        def fetch_sysctl(oids):
+            return (value for oid in oids for value in sysctl.filter(oid))
+
     except ImportError:
-        # Otherwise make a simple sysctl(8) polyfill hopefully sufficient for our needs
         import subprocess
+        from collections import namedtuple
 
-        class SysctlOid:
-            def __init__(self, name='', value=None):
-                self.name = name
-                self.value = value
+        SysctlValue = namedtuple('SysctlValue', ['name', 'value'])
 
-        class sysctl:
-            @staticmethod
-            def filter(oid):
-                r = subprocess.run(["sysctl", "-e", oid],
-                                   capture_output=True, check=False, encoding='latin-1')
-                stats = (line.split("=", 2) for line in r.stdout.split("\n"))
-                return [SysctlOid(*nv) for nv in stats if len(nv) == 2]
+        def fetch_sysctl(oids):
+            r = subprocess.run(['sysctl', '-e', '--', *oids],
+                    capture_output=True, check=False, encoding='latin-1')
+            stats = (line.split("=", 2) for line in r.stdout.split("\n"))
+            return (SysctlValue(*nv) for nv in stats if len(nv) == 2)
 
     from collections import defaultdict
 
@@ -126,7 +125,7 @@ elif sys.platform.startswith("freebsd"):
         def __init__(self, pools=None):
             # We're interested in kstat.zfs.*.dataset.objset-*.*
             if pools:
-                self.oids = (f'kstat.zfs.{pool}.dataset.' for pool in pools)
+                self.oids = tuple(f'kstat.zfs.{pool}.dataset.' for pool in pools)
             else:
                 self.oids = ('kstat.zfs.',)
 
@@ -135,12 +134,11 @@ elif sys.platform.startswith("freebsd"):
             datasets = defaultdict(lambda: {'timestamp': timestamp})
 
             # Note objset ID's are only unique to individual pools
-            for oid in self.oids:
-                for ctl in sysctl.filter(oid):
-                    name = ctl.name.rsplit(".", 4)
-                    if len(name) == 5 and name[2] == 'dataset':
-                        _, pool, _, objset, oid = name
-                        datasets[(pool, objset)][oid] = ctl.value
+            for ctl in fetch_sysctl(self.oids):
+                name = ctl.name.rsplit(".", 4)
+                if len(name) == 5 and name[2] == 'dataset':
+                    _, pool, _, objset, oid = name
+                    datasets[(pool, objset)][oid] = ctl.value
 
             return datasets.values()
 
