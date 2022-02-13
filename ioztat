@@ -819,6 +819,7 @@ def main():
 
     for iteration, diff in enumerate(DatasetDiffIter(args)):
         width, height = shutil.get_terminal_size()
+        width, height = width or 80, height or 24
         avail_width = width - stats_width
         max_name_width = max(max_name_width,
                              max((calc_name_width(d.name) for d in diff), default=10))
