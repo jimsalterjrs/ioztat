@@ -71,34 +71,44 @@ if sys.platform.startswith("linux"):
             if pools:
                 patterns = map(glob.escape, pools)
             else:
-                patterns = ['*']
+                patterns = ["*"]
 
-            self.globs = [os.path.join('/proc/spl/kstat/zfs', pattern, 'objset-*')
-                          for pattern in patterns]
+            self.globs = [
+                os.path.join("/proc/spl/kstat/zfs", pattern, "objset-*")
+                for pattern in patterns
+            ]
 
         def __call__(self):
-            datasets = []
+            datasets = (
+                self.parse_dataset(file)
+                for pattern in self.globs
+                for file in glob.glob(pattern)
+            )
+            return list(filter(None, datasets))
 
-            for pattern in self.globs:
-                for file in glob.glob(pattern):
-                    # Shortened example of these files:
-                    #############################################
-                    # 31 1 0x01 7 2160 6165792836 1634992995579
-                    # name             type data
-                    # dataset_name     7    rpool/ROOT/default
-                    #############################################
-                    # Field 7 of the header is a nanosecond data snapshot timestamp.
-                    # Conveniently, dataset names may not contain spaces.
-                    try:
-                        with open(file, 'r', encoding='latin-1') as f:
-                            header, _fieldnames, *fields = [line.split() for line in f]
-                            fields.append(("timestamp", None, header[6]))
-                            datasets.append({field[0]: field[2]
-                                            for field in fields if len(field) > 2})
-                    except FileNotFoundError:
-                        # Datasets may be destroyed between our globbing and opening
-                        pass
-            return datasets
+        @staticmethod
+        def parse_dataset(file):
+            """Parse a single ZFS objset file"""
+            # Shortened example of these files:
+            #############################################
+            # 31 1 0x01 7 2160 6165792836 1634992995579
+            # name             type data
+            # dataset_name     7    rpool/ROOT/default
+            #############################################
+            # Field 7 of the header is a nanosecond data snapshot timestamp.
+            # Conveniently, dataset names may not contain spaces.
+            try:
+                with open(file, "r", encoding="latin-1") as f:
+                    header, _fieldnames, *fields = [line.split() for line in f]
+                    fields.append(("timestamp", None, header[6]))
+                    return {
+                        field[0]: field[2]
+                        for field in fields
+                        if len(field) > 2
+                    }
+            except FileNotFoundError:
+                # Datasets may be destroyed between our globbing and opening
+                return None
 
 elif sys.platform.startswith("freebsd"):
     try:
