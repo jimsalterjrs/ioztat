@@ -184,8 +184,8 @@ class Dataset:
         d.nread = int(data['nread'])
         d.writes = int(data['writes'])
         d.nwritten = int(data['nwritten'])
-        d.nunlinks = int(data['nunlinks'])
-        d.nunlinked = int(data['nunlinked'])
+        d.nunlinks = int(data.get('nunlinks', 0))
+        d.nunlinked = int(data.get('nunlinked', 0))
         d.timespan = int(data['timestamp']) / 1e9
         return d
 
@@ -603,6 +603,9 @@ def parse_args():
 
     if args.overwrite and not sys.stdout.isatty():
         parser.error('overwrite mode only supported in a terminal')
+
+    if args.extended > 1 and sys.platform.startswith("freebsd12"):
+        print("warning: unlinks statistics require FreeBSD 13+", file=sys.stderr)
 
     return args
 
