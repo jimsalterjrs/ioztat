@@ -759,6 +759,10 @@ class DatasetDiffIter:
             children = any(os.path.commonpath((ds, path)) == ds for path in found)
             if args.non_recursive:
                 if children:
+                    # Accept unmounted datasets as arguments if we're going to
+                    # sum child datasest into them
+                    if args.sum_children:
+                        continue
                     msg = 'mounted'
                 else:
                     msg = 'found'
