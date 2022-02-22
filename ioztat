@@ -125,7 +125,7 @@ elif sys.platform.startswith("freebsd"):
         SysctlValue = namedtuple('SysctlValue', ['name', 'value'])
 
         def fetch_sysctl(oids):
-            r = subprocess.run(['sysctl', '-e', '--', *oids],
+            r = subprocess.run(['/sbin/sysctl', '-e', '--', *oids],
                     capture_output=True, check=False, encoding='latin-1')
             stats = (line.split("=", 2) for line in r.stdout.split("\n"))
             return (SysctlValue(*nv) for nv in stats if len(nv) == 2)
