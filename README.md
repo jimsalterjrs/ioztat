@@ -1,11 +1,14 @@
 # ioztat
-ioztat is a storage load analysis tool for OpenZFS. It provides iostat-like statistics at an individual dataset/zvol level.
 
-The statistics offered are read and write operations per second, read and write throughput per second, and the average size of read and write operations issued in the current reporting interval. Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems--particularly those with many VMs or containers operating essentially independent workloads.
+`ioztat` is a storage load analysis tool for OpenZFS. It provides iostat-like statistics at an individual dataset/zvol level, complementing the pool/vdev level statistics offered by `zpool iostat`.
 
-This sample output shows activity which has taken place in the most recent second, on a the `ssd` zpool of a ZFS virtualization host, with extended statistics showing the average I/O size:
+The statistics offered are per-second or per-interval read/write operations and throughput, plus optional average operation size and ZFS file unlink queue depths.
 
-````
+Viewing these statistics at the individual dataset level allows system administrators to identify storage "hot spots" in larger multi-tenant systems — particularly those with many VMs or containers operating essentially independent workloads.
+
+This sample output shows activity which has taken place in the most recent second, on the `ssd` zpool of a ZFS virtualization host, with extended statistics showing the average I/O size:
+
+```
 root@redacted-prod0:~# ioztat -yx ssd
                    operations    throughput      opsize
 dataset            read  write   read  write   read  write
@@ -23,11 +26,13 @@ ssd                   0      0      0      0      0      0
   iso                 0      0      0      0      0      0
   unsnapped           0      0      0      0      0      0
     rp9               0      0      0      0      0      0
-````
+```
 
-For the most part, `ioztat` behaves the same way that the system standard `iostat` tool does, with similar arguments.
+## Usage
 
-````
+`ioztat` behaves similarly to standard Unix `iostat` tools and the ZFS `zpool iostat` command:
+
+```
 usage: ioztat [-c COUNT] [-D] [-e] [-H] [-h] [-I] [-i INTERVAL] [-N] [-n] [-o]
               [-P | -p] [-S]
               [-s {name,operations,reads,writes,throughput,nread,nwritten}]
@@ -63,10 +68,34 @@ optional arguments:
                         size, twice for unlink queue
   -y                    omit the initial "summary" report
   -z                    omit datasets with zero activity
-  ````
+```
 
-Without arguments, `ioztat` prints a summary of activity for each mounted dataset since the most recent system boot and exits.
+Without arguments, `ioztat` prints a summary of activity for each mounted dataset since the most recent system boot and exits. This initial summary can be skipped with the `-y` flag.
 
-With an optional interval, `ioztat` will repeat reports on that schedule until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second.  Interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
+With an optional interval, `ioztat` will repeat reports on that schedule until interrupted, or up to a specified count.  If only a count is specified, the interval defaults to one second. Interval and count can be specified with `-i` and `-c` or as positional arguments at the very end of the argument list.
 
-The `-o` flag will overwrite prior output and limit the display to the terminal height.  This can be combined with an interval and sorting options for an `iotop`-like experience.
+The `-o` flag will overwrite prior output and limit the display to the terminal height. This can be combined with an interval and sorting options for an `iotop`-like experience.
+
+## Examples
+
+    ioztat -z 5
+
+Display statistics for every dataset with activity, giving per-second averages over 5 second intervals.
+
+    ioztat -ozs operations 5
+
+As above, but order output by read/write operations and overwrite previous reports.
+
+    ioztat -I
+
+Display sum totals of dataset activity since boot.
+
+    ioztat -SIn rpool/USERDATA
+
+As above, but only display rpool/USERDATA, and combine statistics for any child datasets with it.
+
+## Requirements
+
+* Python 3.7 or later
+* Linux with OpenZFS 0.8 or later
+* FreeBSD 12 or later (available in ports as `sysutils/py-ioztat`)
