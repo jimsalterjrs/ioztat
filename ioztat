@@ -372,7 +372,7 @@ class ColumnFormatter:
 
         Must eventually be followed by a call to flush()
         """
-        self.buffer.append(string + end)
+        self.buffer.append(str(string) + end)
 
     def flush(self, lines=None):
         """Print the internal buffer, up to the optional lines limit."""
