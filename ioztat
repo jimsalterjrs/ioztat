@@ -37,7 +37,7 @@ import signal
 import sys
 import time
 
-PROGRAM_VERSION = '2.0.1'
+PROGRAM_VERSION = '2.0.2-dev'
 
 # We have little interesting to do with these signals - restore default handlers
 # so our WIFSIGNALED() state propagates properly to the shell
