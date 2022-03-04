@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] - 2022-03-04
+
+### Fixed
+
+- `TypeError` exception on `-Tu`
+
 ## [2.0.0] - 2022-03-03
 
 ### Added
@@ -67,6 +73,7 @@ The first release of `ioztat` builds on efforts from the Reddit r/zfs community,
 - u/d1722825 (substantial refactoring and cleanup)
 - u/mercenary_sysadmin (addition of the -y flag to allow for easy use with the GNU watch command)
 
+[2.0.1]: https://github.com/jimsalterjrs/ioztat/releases/tag/v2.0.1
 [2.0.0]: https://github.com/jimsalterjrs/ioztat/releases/tag/v2.0.0
 [1.1.0]: https://github.com/jimsalterjrs/ioztat/releases/tag/v1.1.0
 [1.0.0]: https://github.com/jimsalterjrs/ioztat/releases/tag/v1.0.0
