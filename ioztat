@@ -386,7 +386,7 @@ class ColumnFormatter:
 class NumberToHuman:
     """Number formatting functions"""
 
-    SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E')
+    SIZE_PREFIX = ('', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
     FORMATS = ('{:.2f}{}', '{:.1f}{}', '{:.0f}{}')
 
     @classmethod
@@ -404,7 +404,7 @@ class NumberToHuman:
         def fmt(num):
             n = num
             index = 0
-            while n >= divisor and index <= size_prefix_max:
+            while n >= divisor and index < size_prefix_max:
                 n /= divisor
                 index += 1
 
