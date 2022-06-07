@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.2] - unreleased
+
+### Added
+
+- Version checks for supported OpenZFS and FreeBSD versions [#38]
+
+### Fixed
+
+- Unhandled `IndexError` exception on formatted numbers over 2^60
+
 ## [2.0.1] - 2022-03-04
 
 ### Fixed
@@ -93,3 +103,4 @@ The first release of `ioztat` builds on efforts from the Reddit r/zfs community,
 [#31]: https://github.com/jimsalterjrs/ioztat/pull/31
 [#32]: https://github.com/jimsalterjrs/ioztat/pull/32
 [#33]: https://github.com/jimsalterjrs/ioztat/pull/33
+[#33]: https://github.com/jimsalterjrs/ioztat/issues/38
