@@ -98,4 +98,4 @@ As above, but only display rpool/USERDATA, and combine statistics for any child 
 
 * Python 3.7 or later
 * Linux with OpenZFS 0.8 or later
-* FreeBSD 12 or later (available in ports as `sysutils/py-ioztat`)
+* FreeBSD 12.2 or later (available in ports as `sysutils/py-ioztat`)
