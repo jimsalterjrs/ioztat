@@ -48,6 +48,10 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 # our print() calls, restore the handler and then re-raise the signal.
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
+def fail(message):
+    """Print message to stderr and exit with a failure"""
+    print(message, file=sys.stderr)
+    sys.exit(1)
 
 # Platform specific section
 #
@@ -110,6 +114,23 @@ if sys.platform.startswith("linux"):
                 # Datasets may be destroyed between our globbing and opening
                 return None
 
+    def preflight():
+        try:
+            with open("/sys/module/zfs/version", "r", encoding="latin-1") as f:
+                version = f.read().rstrip()
+                match = re.match(r'^(\d+)\.(\d+)', version)
+                if not match:
+                    raise ValueError(f"could not parse '{version}'")
+
+                major, minor = int(match.group(1)), int(match.group(2))
+
+                if major == 0 and minor < 8:
+                    fail(f"OpenZFS {major}.{minor} does not support dataset statistics. Please update to 0.8 or higher.")
+        except (ValueError, OSError) as e:
+            fail(f"Unable to determine OpenZFS version from /sys/module/zfs/version: {e}")
+
+    preflight()
+
 elif sys.platform.startswith("freebsd"):
     try:
         # Attempt to use py-sysctl if available for best performance
@@ -153,9 +174,20 @@ elif sys.platform.startswith("freebsd"):
 
             return datasets.values()
 
+    def preflight():
+        match = re.match(r'(\d+)\.(\d+)', os.uname().release)
+        if not match:
+            fail(f"Unable to determine FreeBSD version from {os.uname().release}")
+
+        major, minor = int(match.group(1)), int(match.group(2))
+
+        if major < 12 or (major == 12 and minor < 2):
+            fail(f"FreeBSD {major}.{minor} does not support dataset statistics. Please update to 12.2 or higher.")
+
+    preflight()
+
 else:
-    print("Unsupported platform: " + sys.platform, file=sys.stderr)
-    sys.exit(1)
+    fail("Unsupported platform: " + sys.platform)
 
 
 ################################################################################
