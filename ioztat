@@ -549,6 +549,7 @@ def parse_args():
                         help='display totals since the last report rather than averaged per-second')
     parser.add_argument('-i', dest='interval', type=float,
                         help='interval between reports in seconds')
+    parser.add_argument('-l', dest='slice', type=str, default='::', help='slice the result - take care with negative arguments')
     parser.add_argument('-N', dest='header_once', action='store_true',
                         help='display headers at most once')
     parser.add_argument('-n', dest='non_recursive', action='store_true',
@@ -740,6 +741,25 @@ class DatasetDiffIter:
 
         # Ensure we return a list from each iteration
         self.apply(list)
+
+        if args.slice != "::":
+            # argparse can't do negative arguments - placing in ' or " is required, strip them
+            s = args.slice.strip("'").strip('"')
+            _start, _stop, _step = (s + "::").split(":", maxsplit=5)[0:3]
+
+            def default(d, v):
+                r = (d, v)
+                if v is not None and v != "":
+                    return int(v)
+                if v == '':
+                    return d
+                else:
+                    raise ValueError((r, (d, v)))
+
+            sl = slice(default(0, _start), default(-1, _stop), default(None, _step))
+            self.apply(lambda x: x.__getitem__(sl))
+
+
 
     def __iter__(self):
         return self.iter
