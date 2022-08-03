@@ -748,13 +748,7 @@ class DatasetDiffIter:
             _start, _stop, _step = (s + "::").split(":", maxsplit=5)[0:3]
 
             def default(d, v):
-                r = (d, v)
-                if v is not None and v != "":
-                    return int(v)
-                if v == '':
-                    return d
-                else:
-                    raise ValueError((r, (d, v)))
+                return int(v) if v != "" else d
 
             sl = slice(default(0, _start), default(-1, _stop), default(None, _step))
             self.apply(lambda x: x.__getitem__(sl))
