@@ -20,7 +20,7 @@
 
 ### Added
 
-- An `iostat(8)` man page
+- An `ioztat(8)` man page
 - `CHANGELOG.md`, this Changelog
 - `-e` and `-H` flags for use in scripting [#26]
 - `-I` flag for totals since last update instead of per-second
