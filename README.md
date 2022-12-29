@@ -86,6 +86,10 @@ Display statistics for every dataset with activity, giving per-second averages o
 
 As above, but order output by read/write operations and overwrite previous reports.
 
+    ioztat -s ops -l "10:0:-1"  
+
+Reverse order of top ten results.
+
     ioztat -I
 
 Display sum totals of dataset activity since boot.
@@ -93,6 +97,7 @@ Display sum totals of dataset activity since boot.
     ioztat -SIn rpool/USERDATA
 
 As above, but only display rpool/USERDATA, and combine statistics for any child datasets with it.
+
 
 ## Requirements
 
