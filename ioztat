@@ -204,7 +204,6 @@ else:
 ################################################################################
 # Core type
 
-@dataclasses.dataclass
 class Dataset:
     """
     ZFS dataset statistics over a timespan in seconds
@@ -213,55 +212,36 @@ class Dataset:
     https://github.com/openzfs/zfs/blob/9681de4657686d0ed19ca18d578513e74395f00f/module/zfs/dataset_kstats.c#L32
 
     """
-    timestamp: int = 0
-    dataset_name: str = ''
-    writes: int = 0
-    nwritten: int = 0
-    reads: int = 0
-    nread: int = 0
+    __slots__ = ("name", "reads", "nread", "writes", "nwritten", "nunlinks", "nunlinked", "timespan")
 
-    nunlinks: int = 0
-    nunlinked: int = 0
-
-    zil_commit_count: int = 0
-    zil_commit_writer_count: int = 0
-    zil_itx_count: int = 0
-    zil_itx_indirect_count: int = 0
-    zil_itx_indirect_bytes: int = 0
-    zil_itx_copied_count: int = 0
-    zil_itx_copied_bytes: int = 0
-    zil_itx_needcopy_count: int = 0
-    zil_itx_needcopy_bytes: int = 0
-    zil_itx_metaslab_normal_count: int = 0
-    zil_itx_metaslab_normal_bytes: int = 0
-    zil_itx_metaslab_slog_count: int = 0
-    zil_itx_metaslab_slog_bytes: int = 0
-
+    def __init__(self, name='', reads=0, nread=0, writes=0, nwritten=0, nunlinks=0, nunlinked=0, timespan=0):
+        self.name = name
+        self.reads = reads
+        self.nread = nread
+        self.writes = writes
+        self.nwritten = nwritten
+        self.nunlinks = nunlinks
+        self.nunlinked = nunlinked
+        self.timespan = timespan
 
 
     @classmethod
     def from_dict(cls, data):
-        kwargs = dict()
-        for name,value in data.items():
-            if name not in frozenset(["dataset_name"]):
-                kwargs[name] = int(value)
-            else:
-                kwargs[name] = value
-        return cls(**kwargs)
+        d = cls(data['dataset_name'])
+        d.reads = int(data['reads'])
+        d.nread = int(data['nread'])
+        d.writes = int(data['writes'])
+        d.nwritten = int(data['nwritten'])
+        d.nunlinks = int(data.get('nunlinks', 0))
+        d.nunlinked = int(data.get('nunlinked', 0))
+        d.timespan = int(data['timestamp']) / 1e9
+        return d
 
 
-    @property
-    def timespan(self):
-        return self.timestamp / 1e9
 
-    @timespan.setter
-    def timespan(self, v):
-        self.timestamp = v * 1e9
-
-
-    @property
-    def name(self):
-        return self.dataset_name
+#    @property
+#    def name(self):
+#        return self.name
 
 
     @property
@@ -289,28 +269,31 @@ class Dataset:
         Return a copy of Dataset with values normalized to per-second rates
         """
         if self.timespan:
-            kwargs = dict()
-            for name,t in typing.get_type_hints(self.__class__).items():
-                if t == int:
-                    kwargs[name] = getattr(self, name) / self.timespan
-                else:
-                    kwargs[name] = getattr(self, name)
-            kwargs["timestamp"] = 1e9
-
-            return Dataset(**kwargs)
+            d = Dataset(self.name)
+            d.reads /= self.timespan
+            d.nread /= self.timespan
+            d.writes /= self.timespan
+            d.nwritten /= self.timespan
+            d.nunlinks /= self.timespan
+            d.nunlinked /= self.timespan
+            d.timespan = 1.0
+            return d
         return self
 
     def __sub__(self, other):
         """
         Return a new Dataset with this one's values subtracted from other
         """
-        d = copy.copy(self)
-        for name, t in typing.get_type_hints(self.__class__).items():
-            if t != int:
-                continue
-            v = getattr(d, name) - getattr(other, name)
-            setattr(d, name, v)
+        d = Dataset(self.name)
+        d.reads = self.reads - other.reads
+        d.nread = self.nread - other.nread
+        d.writes = self.writes - other.writes
+        d.nwritten = self.nwritten - other.nwritten
+        d.nunlinks = self.nunlinks - other.nunlinks
+        d.nunlinked = self.nunlinked - other.nunlinked
+        d.timespan = self.timespan - other.timespan
         return d
+
 
     def __add__(self, other):
         """
@@ -319,13 +302,14 @@ class Dataset:
         Note timespan is set to the maximum of the two values instead of being
         added.
         """
-        d = copy.copy(self)
-        for name, t in typing.get_type_hints(self.__class__).items():
-            if t != int:
-                continue
-            v = getattr(d, name) + getattr(other, name)
-            setattr(d, name, v)
-        d.timespan = max(d.timespan, other.timespan)
+        d = Dataset(self.name)
+        d.reads = self.reads + other.reads
+        d.nread = self.nread + other.nread
+        d.writes = self.writes + other.writes
+        d.nwritten = self.nwritten + other.nwritten
+        d.nunlinks = self.nunlinks + other.nunlinks
+        d.nunlinked = self.nunlinked + other.nunlinked
+        d.timespan = max(self.timespan, other.timespan)
         return d
 
 
