@@ -28,8 +28,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import copy
-import dataclasses
 import math
 import os
 import re
@@ -37,7 +35,6 @@ import shutil
 import signal
 import sys
 import time
-import typing
 
 PROGRAM_VERSION = '2.0.2-dev'
 
@@ -214,16 +211,9 @@ class Dataset:
     """
     __slots__ = ("name", "reads", "nread", "writes", "nwritten", "nunlinks", "nunlinked", "timespan")
 
-    def __init__(self, name='', reads=0, nread=0, writes=0, nwritten=0, nunlinks=0, nunlinked=0, timespan=0):
+    def __init__(self, name):
         self.name = name
-        self.reads = reads
-        self.nread = nread
-        self.writes = writes
-        self.nwritten = nwritten
-        self.nunlinks = nunlinks
-        self.nunlinked = nunlinked
-        self.timespan = timespan
-
+        self.reads = self.nread = self.writes = self.nwritten = self.nunlinks = self.nunlinked = self.timespan = 0
 
     @classmethod
     def from_dict(cls, data):
@@ -236,13 +226,6 @@ class Dataset:
         d.nunlinked = int(data.get('nunlinked', 0))
         d.timespan = int(data['timestamp']) / 1e9
         return d
-
-
-
-#    @property
-#    def name(self):
-#        return self.name
-
 
     @property
     def rareq_sz(self):
@@ -270,12 +253,12 @@ class Dataset:
         """
         if self.timespan:
             d = Dataset(self.name)
-            d.reads /= self.timespan
-            d.nread /= self.timespan
-            d.writes /= self.timespan
-            d.nwritten /= self.timespan
-            d.nunlinks /= self.timespan
-            d.nunlinked /= self.timespan
+            d.reads = self.reads / self.timespan
+            d.nread = self.nreads / self.timespan
+            d.writes = self.writes / self.timespan
+            d.nwritten = self.nwritten / self.timespan
+            d.nunlinks = self.nunlinks / self.timespan
+            d.nunlinked = self.nunlinked / self.timespan
             d.timespan = 1.0
             return d
         return self
@@ -844,7 +827,7 @@ class DatasetDiffIter:
                 if path in sums:
                     sums[path] += diff
                 else:
-                    sums[path] = Dataset(dataset_name=path) + diff
+                    sums[path] = Dataset(path) + diff
 
         return sums.values()
 
